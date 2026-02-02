@@ -43,9 +43,21 @@ const App: React.FC = () => {
     }
   }, [editingInboxId]);
 
+  // Show loading while fetching data
+  if (!state) {
+    return (
+      <div className="min-h-screen bg-[#fcfcfc] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-zinc-200 border-t-zinc-800 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-zinc-400 font-medium tracking-widest">加载中...</p>
+        </div>
+      </div>
+    );
+  }
+
   const { currentDay } = state;
   const isStarted = currentDay.isStarted;
-  const allDone = isStarted && currentDay.tasks.length > 0 && currentDay.tasks.every(t => t.isDone);
+  const allDone = isStarted && currentDay.tasks.length > 0 && currentDay.tasks.every((t: Task) => t.isDone);
   const isDayFinished = !!currentDay.dayReflection;
 
   const addToInbox = () => {
@@ -57,22 +69,28 @@ const App: React.FC = () => {
       isDone: false,
       reflection: '',
     };
-    setState(prev => ({
-      ...prev,
-      currentDay: { ...prev.currentDay, inbox: [...prev.currentDay.inbox, newTask] }
-    }));
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        currentDay: { ...prev.currentDay, inbox: [...prev.currentDay.inbox, newTask] }
+      };
+    });
     setInputTitle('');
   };
 
   const removeTaskFromInbox = (id: string) => {
-    setState(prev => ({
-      ...prev,
-      currentDay: {
-        ...prev.currentDay,
-        inbox: prev.currentDay.inbox.filter(t => t.id !== id),
-        tasks: prev.currentDay.tasks.filter(t => t.id !== id)
-      }
-    }));
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        currentDay: {
+          ...prev.currentDay,
+          inbox: prev.currentDay.inbox.filter((t: Task) => t.id !== id),
+          tasks: prev.currentDay.tasks.filter((t: Task) => t.id !== id)
+        }
+      };
+    });
     if (editingInboxId === id) setEditingInboxId(null);
   };
 
@@ -85,15 +103,18 @@ const App: React.FC = () => {
     if (!editingInboxId) return;
     const trimmed = editingInboxValue.trim();
     if (trimmed) {
-      const updater = (list: Task[]) => list.map(t => t.id === editingInboxId ? { ...t, title: trimmed } : t);
-      setState(prev => ({
-        ...prev,
-        currentDay: {
-          ...prev.currentDay,
-          inbox: updater(prev.currentDay.inbox),
-          tasks: updater(prev.currentDay.tasks)
-        }
-      }));
+      const updater = (list: Task[]) => list.map((t: Task) => t.id === editingInboxId ? { ...t, title: trimmed } : t);
+      setState((prev: AppState | null) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          currentDay: {
+            ...prev.currentDay,
+            inbox: updater(prev.currentDay.inbox),
+            tasks: updater(prev.currentDay.tasks)
+          }
+        };
+      });
     }
     setEditingInboxId(null);
   };
@@ -108,40 +129,52 @@ const App: React.FC = () => {
     const newInbox = [...currentDay.inbox];
     const item = newInbox.splice(draggedIdx, 1)[0];
     newInbox.splice(targetIdx, 0, item);
-    setState(prev => ({ ...prev, currentDay: { ...prev.currentDay, inbox: newInbox } }));
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      return { ...prev, currentDay: { ...prev.currentDay, inbox: newInbox } };
+    });
     setDraggedIdx(null);
   };
 
   const startDay = () => {
     if (currentDay.inbox.length === 0) return;
-    const tasks: Task[] = currentDay.inbox.map((task, idx) => ({
+    const tasks: Task[] = currentDay.inbox.map((task: Task, idx: number) => ({
       ...task,
       size: idx < 3 ? 'big' : 'small'
     }));
-    setState(prev => ({
-      ...prev,
-      currentDay: { ...prev.currentDay, tasks, isStarted: true }
-    }));
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        currentDay: { ...prev.currentDay, tasks, isStarted: true }
+      };
+    });
   };
 
   const backToPlanning = () => {
-    setState(prev => ({
-      ...prev,
-      currentDay: { ...prev.currentDay, isStarted: false }
-    }));
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        currentDay: { ...prev.currentDay, isStarted: false }
+      };
+    });
   };
 
   const saveEditModal = (newTitle: string) => {
     if (!editingTask) return;
-    const updater = (list: Task[]) => list.map(t => t.id === editingTask.id ? { ...t, title: newTitle } : t);
-    setState(prev => ({
-      ...prev,
-      currentDay: {
-        ...prev.currentDay,
-        inbox: updater(prev.currentDay.inbox),
-        tasks: updater(prev.currentDay.tasks)
-      }
-    }));
+    const updater = (list: Task[]) => list.map((t: Task) => t.id === editingTask.id ? { ...t, title: newTitle } : t);
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        currentDay: {
+          ...prev.currentDay,
+          inbox: updater(prev.currentDay.inbox),
+          tasks: updater(prev.currentDay.tasks)
+        }
+      };
+    });
     setEditingTask(null);
   };
 
@@ -150,24 +183,27 @@ const App: React.FC = () => {
   const handleReflectionSubmit = async (reflection: string) => {
     if (!reflectingTaskId) return;
     setLoadingMsg("正在思考如何鼓励你...");
-    const taskToUpdate = currentDay.tasks.find(t => t.id === reflectingTaskId)!;
+    const taskToUpdate = currentDay.tasks.find((t: Task) => t.id === reflectingTaskId)!;
     const encouragement = await generateEncouragement(taskToUpdate.title, taskToUpdate.size, reflection);
     setLoadingMsg(null);
 
-    const taskUpdater = (list: Task[]) => list.map(t =>
+    const taskUpdater = (list: Task[]) => list.map((t: Task) =>
       t.id === reflectingTaskId
         ? { ...t, isDone: true, reflection, encouragement, doneAt: new Date().toISOString() }
         : t
     );
 
-    setState(prev => ({
-      ...prev,
-      currentDay: {
-        ...prev.currentDay,
-        tasks: taskUpdater(prev.currentDay.tasks),
-        inbox: taskUpdater(prev.currentDay.inbox)
-      }
-    }));
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        currentDay: {
+          ...prev.currentDay,
+          tasks: taskUpdater(prev.currentDay.tasks),
+          inbox: taskUpdater(prev.currentDay.inbox)
+        }
+      };
+    });
     setShowEncouragement({ title: taskToUpdate.title, msg: encouragement });
     setReflectingTaskId(null);
   };
@@ -176,27 +212,18 @@ const App: React.FC = () => {
     setLoadingMsg("正在为你总结今日...");
     const summary = await generateDayEndReflection(currentDay.tasks, rating);
     setLoadingMsg(null);
-    setState(prev => ({
-      ...prev,
-      currentDay: { ...prev.currentDay, dayRating: rating, dayReflection: summary }
-    }));
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        currentDay: { ...prev.currentDay, dayRating: rating, dayReflection: summary }
+      };
+    });
   };
 
-  const bigTasks = currentDay.tasks.filter(t => t.size === 'big');
-  const smallTasks = currentDay.tasks.filter(t => t.size === 'small');
-  const activeReflectingTask = currentDay.tasks.find(t => t.id === reflectingTaskId);
-
-  // Show loading while fetching data
-  if (!state) {
-    return (
-      <div className="min-h-screen bg-[#fcfcfc] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-zinc-200 border-t-zinc-800 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-zinc-400 font-medium tracking-widest">加载中...</p>
-        </div>
-      </div>
-    );
-  }
+  const bigTasks = currentDay.tasks.filter((t: Task) => t.size === 'big');
+  const smallTasks = currentDay.tasks.filter((t: Task) => t.size === 'small');
+  const activeReflectingTask = currentDay.tasks.find((t: Task) => t.id === reflectingTaskId);
 
   return (
     <div className="min-h-screen bg-[#fcfcfc] text-zinc-900 flex flex-col items-center">
@@ -227,7 +254,7 @@ const App: React.FC = () => {
                   调整计划
                 </button>
                 <div className="flex gap-2 text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
-                  <span>PROGRESS: {currentDay.tasks.filter(t => t.isDone).length} / {currentDay.tasks.length}</span>
+                  <span>PROGRESS: {currentDay.tasks.filter((t: Task) => t.isDone).length} / {currentDay.tasks.length}</span>
                 </div>
              </div>
           )}
@@ -258,7 +285,7 @@ const App: React.FC = () => {
                   </div>
                 )}
                 <div className="flex flex-col gap-3">
-                  {currentDay.inbox.map((task, idx) => (
+                  {currentDay.inbox.map((task: Task, idx: number) => (
                     <div
                       key={task.id}
                       draggable={editingInboxId !== task.id}
@@ -321,7 +348,7 @@ const App: React.FC = () => {
                   <div className="flex flex-col gap-6 mb-10 relative">
                      {currentDay.inbox.length > 0 ? (
                        <div className="flex flex-col gap-4">
-                         {currentDay.inbox.map((t, idx) => {
+                         {currentDay.inbox.map((t: Task, idx: number) => {
                            const isBig = idx < 3;
                            return (
                              <div
@@ -373,7 +400,7 @@ const App: React.FC = () => {
                 <span className="w-2 h-2 bg-rose-500 rounded-full"></span>
                 今日大事 (Big Three)
               </h3>
-              {bigTasks.map((task, idx) => (
+              {bigTasks.map((task: Task, idx: number) => (
                 <TaskCard
                   key={task.id}
                   task={task}
@@ -394,7 +421,7 @@ const App: React.FC = () => {
                   今天没有额外的小事
                 </div>
               )}
-              {smallTasks.map((task, idx) => (
+              {smallTasks.map((task: Task, idx: number) => (
                 <TaskCard
                   key={task.id}
                   task={task}
