@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Task, DayRecord, AppState } from './types';
+import { Task, AppState } from './types';
 import { loadState, saveState } from './services/storage';
 import { generateEncouragement, generateDayEndReflection } from './services/deepseekService';
 import { exportToMarkdown, exportToCSV } from './services/exportService';
