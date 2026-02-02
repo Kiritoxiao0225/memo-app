@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Task, AppState } from './types';
-import { loadState, saveState } from './services/storage';
+import { subscribeToData, saveState } from './services/firebaseStorage';
 import { generateEncouragement, generateDayEndReflection } from './services/deepseekService';
 import { exportToMarkdown, exportToCSV } from './services/exportService';
 import ReflectionModal from './components/ReflectionModal';
 import EditModal from './components/EditModal';
 
 const App: React.FC = () => {
-  const [state, setState] = useState<AppState>(loadState());
+  const [state, setState] = useState<AppState | null>(null);
   const [inputTitle, setInputTitle] = useState('');
   const [reflectingTaskId, setReflectingTaskId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -21,8 +21,19 @@ const App: React.FC = () => {
   const [editingInboxValue, setEditingInboxValue] = useState('');
   const inlineInputRef = useRef<HTMLInputElement>(null);
 
+  // Subscribe to Firebase data
   useEffect(() => {
-    saveState(state);
+    const unsubscribe = subscribeToData((newState) => {
+      setState(newState);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Save to Firebase when state changes
+  useEffect(() => {
+    if (state) {
+      saveState(state);
+    }
   }, [state]);
 
   useEffect(() => {
@@ -174,6 +185,18 @@ const App: React.FC = () => {
   const bigTasks = currentDay.tasks.filter(t => t.size === 'big');
   const smallTasks = currentDay.tasks.filter(t => t.size === 'small');
   const activeReflectingTask = currentDay.tasks.find(t => t.id === reflectingTaskId);
+
+  // Show loading while fetching data
+  if (!state) {
+    return (
+      <div className="min-h-screen bg-[#fcfcfc] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-zinc-200 border-t-zinc-800 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-zinc-400 font-medium tracking-widest">加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#fcfcfc] text-zinc-900 flex flex-col items-center">
