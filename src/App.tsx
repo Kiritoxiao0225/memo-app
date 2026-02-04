@@ -59,7 +59,7 @@ const App: React.FC = () => {
   const { currentDay, currentView, history } = state;
   const isStarted = currentDay.isStarted;
   const allDone = isStarted && currentDay.tasks.length > 0 && currentDay.tasks.every((t: Task) => t.isDone);
-  const isDayFinished = !!currentDay.dayReflection || currentView === 'journal';
+  const isDayFinished = !!currentDay.dayRating || currentView === 'journal';
 
   const bigTasks = currentDay.tasks.filter((t: Task) => t.size === 'big');
   const smallTasks = currentDay.tasks.filter((t: Task) => t.size === 'small');
@@ -98,16 +98,41 @@ const App: React.FC = () => {
       return;
     }
 
+    const today = new Date().toISOString().split('T')[0];
+
     setState((prev: AppState | null) => {
       if (!prev) return prev;
+
+      // 检查历史中是否已有今天的记录
+      const existingHistoryIndex = prev.history.findIndex(day => day.date === today);
+
+      let newHistory = [...prev.history];
+
+      if (existingHistoryIndex >= 0) {
+        // 更新已有的今天记录
+        newHistory[existingHistoryIndex] = {
+          ...prev.currentDay,
+          journalEntry: entry,
+          journalCreatedAt: new Date().toISOString(),
+        };
+      } else {
+        // 添加新记录
+        newHistory = [{
+          ...prev.currentDay,
+          journalEntry: entry,
+          journalCreatedAt: new Date().toISOString(),
+        }, ...prev.history];
+      }
+
       return {
         ...prev,
+        history: newHistory,
         currentDay: {
           ...prev.currentDay,
           journalEntry: entry,
           journalCreatedAt: new Date().toISOString(),
         },
-        currentView: 'journal',
+        currentView: 'history',
       };
     });
   };
@@ -205,10 +230,6 @@ const App: React.FC = () => {
     });
   };
 
-  const backToPlanning = () => {
-    navigateTo('planning');
-  };
-
   const saveEditModal = (newTitle: string) => {
     if (!editingTask) return;
     const updater = (list: Task[]) => list.map((t: Task) => t.id === editingTask.id ? { ...t, title: newTitle } : t);
@@ -261,6 +282,8 @@ const App: React.FC = () => {
     const summary = await generateJournalEntry(currentDay.tasks, rating);
     setLoadingMsg(null);
 
+    // 先保存 dayRating 和 journalEntry，跳转到日记页面
+    // 等待用户保存后才正式更新 history
     setState((prev: AppState | null) => {
       if (!prev) return prev;
       return {
@@ -269,7 +292,6 @@ const App: React.FC = () => {
           ...prev.currentDay,
           dayRating: rating,
           journalEntry: summary,
-          journalCreatedAt: new Date().toISOString(),
         },
         currentView: 'journal',
       };
@@ -317,24 +339,54 @@ const App: React.FC = () => {
               {isDayFinished ? "今天已尘埃落定" : (isStarted ? "专注于当下的节奏" : "列出、排序、然后出发")}
             </h1>
           </div>
-          {isStarted && !isDayFinished && (
-             <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            {/* 历史记录按钮 */}
+            {history.length > 0 && (
+              <button
+                onClick={() => navigateTo('history')}
+                className="px-4 py-2 border border-zinc-200 rounded-xl text-zinc-400 text-[10px] font-black tracking-widest uppercase hover:bg-zinc-50 hover:text-zinc-600 transition-all flex items-center gap-2"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                历史 ({history.length})
+              </button>
+            )}
+            {isStarted && (
+              <>
                 <button
-                  onClick={backToPlanning}
+                  onClick={() => navigateTo('planning')}
                   className="px-4 py-2 border border-zinc-200 rounded-xl text-zinc-400 text-[10px] font-black tracking-widest uppercase hover:bg-zinc-50 hover:text-zinc-600 transition-all flex items-center gap-2"
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 8.959 8.959 0 01-9 9 8.959 8.959 0 01-9-9z"></path></svg>
                   调整计划
                 </button>
-                <div className="flex gap-2 text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
-                  <span>PROGRESS: {currentDay.tasks.filter((t: Task) => t.isDone).length} / {currentDay.tasks.length}</span>
-                </div>
-             </div>
-          )}
+                {!isDayFinished && (
+                  <div className="flex gap-2 text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
+                    <span>PROGRESS: {currentDay.tasks.filter((t: Task) => t.isDone).length} / {currentDay.tasks.length}</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </header>
 
-        {!isStarted && (
+        {currentView === 'planning' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 animate-in fade-in slide-in-from-bottom-6 duration-700">
+            {/* 返回按钮 - 只在已开始的日期显示 */}
+            {isStarted && (
+              <div className="lg:col-span-12 mb-4">
+                <button
+                  onClick={() => navigateTo('working')}
+                  className="flex items-center gap-2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
+                  </svg>
+                  <span className="text-sm font-medium">返回今日安排</span>
+                </button>
+              </div>
+            )}
             <div className="lg:col-span-5 flex flex-col gap-8">
               <section className="bg-white border-2 border-zinc-900 p-2 rounded-[2rem] shadow-2xl flex items-center gap-2">
                 <input
@@ -466,8 +518,10 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {isStarted && !isDayFinished && (
+        {/* Working 视图 */}
+        {currentView === 'working' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in fade-in duration-700">
+            {/* 大事 */}
             <div className="flex flex-col gap-6">
               <h3 className="text-xs font-black text-rose-500 uppercase tracking-[0.3em] px-4 flex items-center gap-2">
                 <span className="w-2 h-2 bg-rose-500 rounded-full"></span>
@@ -504,7 +558,13 @@ const App: React.FC = () => {
                 />
               ))}
 
-              {allDone && (
+              {/* DEBUG INFO - 调试用 */}
+              <div className="mt-4 p-2 bg-yellow-50 text-yellow-800 text-xs rounded">
+                调试: isStarted={String(isStarted)} isDayFinished={String(isDayFinished)} allDone={String(allDone)} tasks={currentDay.tasks.length} done={currentDay.tasks.filter(t => t.isDone).length}
+              </div>
+
+              {/* 评价按钮 - 只在未完成当天时显示 */}
+              {!isDayFinished && allDone && (
                 <div className="mt-6 bg-zinc-900 text-white p-10 rounded-[3.5rem] shadow-2xl animate-in zoom-in duration-700">
                   <h2 className="text-2xl font-bold mb-8 seriftitle text-center leading-tight">今天的仗打完了，<br/>感觉如何？</h2>
                   <div className="flex gap-4">
@@ -515,16 +575,6 @@ const App: React.FC = () => {
               )}
             </div>
           </div>
-        )}
-
-        {isDayFinished && currentView === 'working' && (
-          <JournalPage
-            tasks={currentDay.tasks}
-            rating={currentDay.dayRating || false}
-            journalEntry={currentDay.journalEntry || ''}
-            onSaveJournal={handleSaveJournal}
-            onBack={() => {}}
-          />
         )}
       </main>
 

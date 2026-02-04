@@ -1,7 +1,8 @@
 
-import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { initializeApp, FirebaseApp } from 'firebase/app';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, Firestore } from 'firebase/firestore';
 import { AppState, DayRecord } from '../types';
+import { saveState as saveToLocal, loadState as loadFromLocal } from './storage';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -12,9 +13,27 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Check if Firebase is properly configured
+const isFirebaseConfigured = () => {
+  return !!(
+    firebaseConfig.apiKey &&
+    firebaseConfig.authDomain &&
+    firebaseConfig.projectId &&
+    firebaseConfig.appId
+  );
+};
+
+let app: FirebaseApp | null = null;
+let db: Firestore | null = null;
+
+try {
+  if (isFirebaseConfigured()) {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+  }
+} catch (error) {
+  console.warn('Firebase initialization failed, falling back to localStorage');
+}
 
 // Document ID for the app data
 const DATA_DOC_ID = 'user-data';
@@ -31,9 +50,7 @@ const createNewDay = (date: string): DayRecord => ({
 const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { currentDay: DayRecord; history: DayRecord[] } => {
   const today = new Date().toISOString().split('T')[0];
 
-  // If the current day is not today, archive it and create a new day
   if (currentDay.date !== today) {
-    // Only archive if the day had started (had tasks or was started)
     if (currentDay.isStarted || currentDay.tasks.length > 0 || currentDay.inbox.length > 0) {
       const newHistory = [currentDay, ...history];
       return {
@@ -41,7 +58,6 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
         history: newHistory,
       };
     }
-    // If no data was recorded, just update the date
     return {
       currentDay: createNewDay(today),
       history,
@@ -51,26 +67,41 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
   return { currentDay, history };
 };
 
+// Use localStorage fallback
+const useLocalStorage = () => !db;
+
 export const subscribeToData = (callback: (state: AppState) => void) => {
-  const docRef = doc(db, 'appData', DATA_DOC_ID);
+  if (useLocalStorage()) {
+    // Use localStorage
+    const data = loadFromLocal();
+    callback(data);
+    return () => {};
+  }
+
+  const docRef = doc(db!, 'appData', DATA_DOC_ID);
 
   return onSnapshot(docRef, async (docSnap) => {
     if (docSnap.exists()) {
       let data = docSnap.data() as AppState;
 
-      // Ensure currentView exists
       if (!data.currentView) {
         data = { ...data, currentView: 'planning' };
       }
 
-      // Check if we need to switch to a new day
       const { currentDay, history } = checkAndSwitchDay(data.currentDay, data.history || []);
       data = { ...data, currentDay, history };
+
+      // Reset dayRating and journalEntry when starting a new session on the same day
+      if (data.currentDay.dayRating !== undefined) {
+        delete data.currentDay.dayRating;
+      }
+      if (data.currentDay.journalEntry !== undefined) {
+        delete data.currentDay.journalEntry;
+      }
 
       await setDoc(docRef, data);
       callback(data);
     } else {
-      // Create default data if not exists
       const today = new Date().toISOString().split('T')[0];
       const defaultState: AppState = {
         currentDay: createNewDay(today),
@@ -84,31 +115,45 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
 };
 
 export const saveState = async (state: AppState): Promise<void> => {
-  const docRef = doc(db, 'appData', DATA_DOC_ID);
+  if (useLocalStorage()) {
+    saveToLocal(state);
+    return;
+  }
+
+  const docRef = doc(db!, 'appData', DATA_DOC_ID);
   await setDoc(docRef, state);
 };
 
 export const loadState = async (): Promise<AppState> => {
-  const docRef = doc(db, 'appData', DATA_DOC_ID);
+  if (useLocalStorage()) {
+    return loadFromLocal();
+  }
+
+  const docRef = doc(db!, 'appData', DATA_DOC_ID);
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
     let data = docSnap.data() as AppState;
 
-    // Ensure currentView exists
     if (!data.currentView) {
       data = { ...data, currentView: 'planning' };
     }
 
-    // Check if we need to switch to a new day
     const { currentDay, history } = checkAndSwitchDay(data.currentDay, data.history || []);
     data = { ...data, currentDay, history };
+
+    // Reset dayRating and journalEntry when starting a new session on the same day
+    if (data.currentDay.dayRating !== undefined) {
+      delete data.currentDay.dayRating;
+    }
+    if (data.currentDay.journalEntry !== undefined) {
+      delete data.currentDay.journalEntry;
+    }
 
     await setDoc(docRef, data);
     return data;
   }
 
-  // Create default data
   const today = new Date().toISOString().split('T')[0];
   const defaultState: AppState = {
     currentDay: createNewDay(today),

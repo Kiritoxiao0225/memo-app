@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { DayRecord } from '../types';
 
@@ -19,7 +20,21 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack }) => {
     });
   };
 
-  const getCompletionRate = (day: DayRecord) => {
+  const getBigCompletionRate = (day: DayRecord) => {
+    const bigTasks = day.tasks.filter(t => t.size === 'big');
+    if (bigTasks.length === 0) return null;
+    const completed = bigTasks.filter(t => t.isDone).length;
+    return Math.round((completed / bigTasks.length) * 100);
+  };
+
+  const getSmallCompletionRate = (day: DayRecord) => {
+    const smallTasks = day.tasks.filter(t => t.size === 'small');
+    if (smallTasks.length === 0) return null;
+    const completed = smallTasks.filter(t => t.isDone).length;
+    return Math.round((completed / smallTasks.length) * 100);
+  };
+
+  const getOverallCompletionRate = (day: DayRecord) => {
     if (day.tasks.length === 0) return 0;
     const completed = day.tasks.filter(t => t.isDone).length;
     return Math.round((completed / day.tasks.length) * 100);
@@ -63,8 +78,12 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack }) => {
             </div>
           ) : (
             history.map((day) => {
-              const completionRate = getCompletionRate(day);
+              const overallRate = getOverallCompletionRate(day);
+              const bigRate = getBigCompletionRate(day);
+              const smallRate = getSmallCompletionRate(day);
               const isExpanded = expandedDay === day.date;
+              const bigTasks = day.tasks.filter(t => t.size === 'big');
+              const smallTasks = day.tasks.filter(t => t.size === 'small');
 
               return (
                 <div
@@ -78,20 +97,25 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack }) => {
                   >
                     <div className="flex items-center gap-4">
                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg seriftitle ${
-                        completionRate === 100
+                        overallRate === 100
                           ? 'bg-emerald-100 text-emerald-600'
-                          : completionRate >= 50
+                          : overallRate >= 50
                           ? 'bg-amber-100 text-amber-600'
                           : 'bg-zinc-100 text-zinc-400'
                       }`}>
-                        {completionRate}%
+                        {overallRate}%
                       </div>
                       <div>
                         <div className="font-bold seriftitle text-lg text-zinc-800">
                           {formatDate(day.date)}
                         </div>
-                        <div className="text-xs text-zinc-400 mt-1">
-                          {day.tasks.filter(t => t.isDone).length} / {day.tasks.length} 件事完成
+                        <div className="text-xs text-zinc-400 mt-1 flex gap-3">
+                          {bigRate !== null && (
+                            <span>大事: {bigTasks.filter(t => t.isDone).length}/{bigTasks.length}</span>
+                          )}
+                          {smallRate !== null && smallTasks.length > 0 && (
+                            <span>小事: {smallTasks.filter(t => t.isDone).length}/{smallTasks.length}</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -108,51 +132,113 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack }) => {
                   {/* Expanded Content */}
                   {isExpanded && (
                     <div className="px-6 pb-6 border-t border-zinc-50 animate-in fade-in slide-in-from-top-2 duration-300">
-                      {/* Tasks */}
-                      <div className="mt-4">
-                        <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">日程</h4>
-                        <div className="flex flex-col gap-2">
-                          {day.tasks.map((task, idx) => (
-                            <div
-                              key={task.id}
-                              className={`flex items-center gap-3 p-3 rounded-xl ${
-                                task.isDone ? 'bg-emerald-50' : 'bg-zinc-50'
-                              }`}
-                            >
-                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                task.isDone
-                                  ? 'bg-emerald-500 text-white'
-                                  : 'bg-zinc-200 text-zinc-400'
-                              }`}>
-                                {task.isDone ? (
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
-                                  </svg>
-                                ) : (
-                                  idx + 1
-                                )}
-                              </span>
-                              <span className={`flex-1 font-medium ${
-                                task.isDone ? 'text-zinc-600 line-through' : 'text-zinc-500'
-                              }`}>
-                                {task.title}
-                              </span>
-                              <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full ${
-                                task.size === 'big' ? 'bg-rose-100 text-rose-500' : 'bg-zinc-100 text-zinc-400'
-                              }`}>
-                                {task.size === 'big' ? '大事' : '小事'}
-                              </span>
-                            </div>
-                          ))}
+                      {/* Big Tasks */}
+                      {bigTasks.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-rose-500 rounded-full"></span>
+                            今日大事
+                          </h4>
+                          <div className="flex flex-col gap-2">
+                            {bigTasks.map((task, idx) => (
+                              <div
+                                key={task.id}
+                                className={`flex items-start gap-3 p-4 rounded-xl ${
+                                  task.isDone ? 'bg-emerald-50' : 'bg-zinc-50'
+                                }`}
+                              >
+                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                  task.isDone
+                                    ? 'bg-emerald-500 text-white'
+                                    : 'bg-zinc-200 text-zinc-400'
+                                }`}>
+                                  {task.isDone ? (
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                                    </svg>
+                                  ) : (
+                                    idx + 1
+                                  )}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <span className={`font-bold seriftitle block ${
+                                    task.isDone ? 'text-zinc-700 line-through' : 'text-zinc-600'
+                                  }`}>
+                                    {task.title}
+                                  </span>
+                                  {task.isDone && task.encouragement && (
+                                    <div className="mt-2 text-sm text-zinc-900 flex items-center gap-2">
+                                      <span className="w-1 h-1 bg-emerald-400 rounded-full"></span>
+                                      {task.encouragement}
+                                    </div>
+                                  )}
+                                  {task.isDone && task.reflection && (
+                                    <div className="mt-2 text-xs text-zinc-400 italic">
+                                      "{task.reflection}"
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
+
+                      {/* Small Tasks */}
+                      {smallTasks.length > 0 && (
+                        <div className="mt-6">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-zinc-300 rounded-full"></span>
+                            后续小事
+                          </h4>
+                          <div className="flex flex-col gap-2">
+                            {smallTasks.map((task, idx) => (
+                              <div
+                                key={task.id}
+                                className={`flex items-start gap-3 p-3 rounded-xl ${
+                                  task.isDone ? 'bg-emerald-50' : 'bg-zinc-50'
+                                }`}
+                              >
+                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                                  task.isDone
+                                    ? 'bg-emerald-500 text-white'
+                                    : 'bg-zinc-200 text-zinc-400'
+                                }`}>
+                                  {task.isDone ? (
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                                    </svg>
+                                  ) : (
+                                    idx + 1
+                                  )}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <span className={`font-medium block ${
+                                    task.isDone ? 'text-zinc-600 line-through' : 'text-zinc-500'
+                                  }`}>
+                                    {task.title}
+                                  </span>
+                                  {task.isDone && task.encouragement && (
+                                    <div className="mt-1 text-sm text-zinc-900 flex items-center gap-2">
+                                      <span className="w-1 h-1 bg-emerald-400 rounded-full"></span>
+                                      {task.encouragement}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Journal */}
                       {day.journalEntry && (
                         <div className="mt-6">
                           <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">日记</h4>
-                          <div className="p-4 bg-zinc-50 rounded-xl italic text-zinc-600 text-sm leading-relaxed">
-                            "{day.journalEntry}"
+                          <div className="p-5 bg-zinc-900 rounded-2xl text-white">
+                            <p className="text-sm leading-relaxed font-medium italic">
+                              {day.journalEntry}
+                            </p>
                           </div>
                         </div>
                       )}

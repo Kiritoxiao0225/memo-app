@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface ReflectionModalProps {
   taskTitle: string;
@@ -10,6 +10,13 @@ interface ReflectionModalProps {
 
 const ReflectionModal: React.FC<ReflectionModalProps> = ({ taskTitle, isOpen, onClose, onSubmit }) => {
   const [text, setText] = useState('');
+
+  // Reset text when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setText('');
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -22,6 +29,9 @@ const ReflectionModal: React.FC<ReflectionModalProps> = ({ taskTitle, isOpen, on
         </p>
         <textarea
           autoFocus
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           className="w-full h-32 p-4 border border-gray-100 bg-gray-50 rounded-xl focus:ring-2 focus:ring-black outline-none transition-all resize-none mb-6"
           placeholder="写在这里..."
           value={text}

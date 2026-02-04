@@ -17,7 +17,8 @@ const JournalPage: React.FC<JournalPageProps> = ({
   onBack,
 }) => {
   const [entry, setEntry] = useState(initialEntry || '');
-  const [isEditing, setIsEditing] = useState(!initialEntry);
+  // 默认进入编辑模式，让用户可以立即查看/修改 AI 生成的日记
+  const [isEditing, setIsEditing] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Auto-generate journal when component mounts if no entry

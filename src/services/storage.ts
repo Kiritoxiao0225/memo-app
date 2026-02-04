@@ -38,6 +38,15 @@ export const loadState = (): AppState => {
     };
   }
 
+  // Reset dayRating and journalEntry when starting a new session on the same day
+  // This allows users to re-do their day evaluation if they haven't switched days
+  if (parsed.currentDay.dayRating !== undefined) {
+    delete parsed.currentDay.dayRating;
+  }
+  if (parsed.currentDay.journalEntry !== undefined) {
+    delete parsed.currentDay.journalEntry;
+  }
+
   // Migration for old data structures
   if (parsed.currentDay.inbox === undefined) {
     parsed.currentDay.inbox = [];
