@@ -558,11 +558,6 @@ const App: React.FC = () => {
                 />
               ))}
 
-              {/* DEBUG INFO - 调试用 */}
-              <div className="mt-4 p-2 bg-yellow-50 text-yellow-800 text-xs rounded">
-                调试: isStarted={String(isStarted)} isDayFinished={String(isDayFinished)} allDone={String(allDone)} tasks={currentDay.tasks.length} done={currentDay.tasks.filter(t => t.isDone).length}
-              </div>
-
               {/* 评价按钮 - 只在未完成当天时显示 */}
               {!isDayFinished && allDone && (
                 <div className="mt-6 bg-zinc-900 text-white p-10 rounded-[3.5rem] shadow-2xl animate-in zoom-in duration-700">
