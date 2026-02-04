@@ -1,6 +1,8 @@
 
 // DeepSeek API service using OpenAI-compatible format
 
+import { Task } from '../types';
+
 const API_BASE = 'https://api.deepseek.com';
 const API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY || '';
 
@@ -122,4 +124,70 @@ function getLocalDayReflection(rating: boolean): string {
     return '今天你认真对待了自己的目标，无论结果如何，这份诚实和努力本身就值得肯定。好好休息，明天继续。';
   }
   return '今天不太顺利，但能诚实面对自己的状态也是一种力量。允许自己休息，明天重新来过。';
+}
+
+// 生成情感陪伴式日记
+export async function generateJournalEntry(tasks: Task[], rating: boolean): Promise<string> {
+  // If no API key, use local fallback
+  if (!API_KEY) {
+    return getLocalJournalEntry(tasks, rating);
+  }
+
+  const taskSummary = tasks
+    .map((t, idx) => {
+      const status = t.isDone ? '✓ 已完成' : '○ 未完成';
+      const reflection = t.reflection ? `（复盘：${t.reflection}）` : '';
+      const num = idx + 1;
+      return `${num}. ${status} ${t.title}${reflection}`;
+    })
+    .join('\n');
+
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: `你是一个温暖、富有同理心的日记陪伴者。
+      你的文字要：
+      1. 生动、有画面感，像在和用户聊天
+      2. 充满情感支持，但不是空洞的鸡汤
+      3. 能帮用户看见自己的一天，无论成功还是挫折
+      4. 150-200字左右，用温柔的语调`
+    },
+    {
+      role: 'user',
+      content: `今天我的一天是这样的：
+
+${taskSummary}
+
+整体评价：今天${rating ? '整体还不错' : '有点艰难'}
+
+请用温暖陪伴的方式，写一段今天的日记，像朋友聊天那样自然的语气。`
+    }
+  ];
+
+  const result = await chatCompletion(messages);
+  return result || getLocalJournalEntry(tasks, rating);
+}
+
+// 本地备用的日记生成
+function getLocalJournalEntry(tasks: Task[], rating: boolean): string {
+  const completed = tasks.filter(t => t.isDone).length;
+  const total = tasks.length;
+
+  if (rating) {
+    return `今天，你完成了 ${completed}/${total} 件事。
+
+每一件完成的事，都是你给自己的承诺。你一件件去做了，不管中间有什么困难，最终还是把它们拿下来了。
+
+这就是你的一天——踏实地、诚实地度过的。
+
+明天，继续。`;
+  } else {
+    return `今天，${completed}/${total} 件事完成了。
+
+没做完的那些，没关系。也许是时间不够，也许是被其他事情打断，这都很正常。
+
+重要的是，你还在这里，还在记录，还在想要变得更好。
+
+休息一下，明天又是新的一天。`;
+  }
 }

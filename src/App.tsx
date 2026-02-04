@@ -2,10 +2,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Task, AppState } from './types';
 import { subscribeToData, saveState } from './services/firebaseStorage';
-import { generateEncouragement, generateDayEndReflection } from './services/deepseekService';
-import { exportToMarkdown, exportToCSV } from './services/exportService';
+import { generateEncouragement, generateJournalEntry } from './services/deepseekService';
 import ReflectionModal from './components/ReflectionModal';
 import EditModal from './components/EditModal';
+import JournalPage from './components/JournalPage';
+import HistoryPage from './components/HistoryPage';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState | null>(null);
@@ -55,11 +56,63 @@ const App: React.FC = () => {
     );
   }
 
-  const { currentDay } = state;
+  const { currentDay, currentView, history } = state;
   const isStarted = currentDay.isStarted;
   const allDone = isStarted && currentDay.tasks.length > 0 && currentDay.tasks.every((t: Task) => t.isDone);
-  const isDayFinished = !!currentDay.dayReflection;
+  const isDayFinished = !!currentDay.dayReflection || currentView === 'journal';
 
+  const bigTasks = currentDay.tasks.filter((t: Task) => t.size === 'big');
+  const smallTasks = currentDay.tasks.filter((t: Task) => t.size === 'small');
+  const activeReflectingTask = currentDay.tasks.find((t: Task) => t.id === reflectingTaskId);
+
+  // Navigation functions
+  const navigateTo = (view: 'planning' | 'working' | 'journal' | 'history') => {
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      return { ...prev, currentView: view };
+    });
+  };
+
+  const handleGenerateJournal = async () => {
+    if (!currentDay.tasks.length) return;
+
+    const entry = await generateJournalEntry(currentDay.tasks, currentDay.dayRating || false);
+
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        currentDay: {
+          ...prev.currentDay,
+          journalEntry: entry,
+          journalCreatedAt: new Date().toISOString(),
+        },
+        currentView: 'journal',
+      };
+    });
+  };
+
+  const handleSaveJournal = (entry: string) => {
+    if (entry === '__GENERATING__') {
+      handleGenerateJournal();
+      return;
+    }
+
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        currentDay: {
+          ...prev.currentDay,
+          journalEntry: entry,
+          journalCreatedAt: new Date().toISOString(),
+        },
+        currentView: 'journal',
+      };
+    });
+  };
+
+  // Task management functions
   const addToInbox = () => {
     if (!inputTitle.trim()) return;
     const newTask: Task = {
@@ -146,19 +199,14 @@ const App: React.FC = () => {
       if (!prev) return prev;
       return {
         ...prev,
-        currentDay: { ...prev.currentDay, tasks, isStarted: true }
+        currentDay: { ...prev.currentDay, tasks, isStarted: true },
+        currentView: 'working'
       };
     });
   };
 
   const backToPlanning = () => {
-    setState((prev: AppState | null) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        currentDay: { ...prev.currentDay, isStarted: false }
-      };
-    });
+    navigateTo('planning');
   };
 
   const saveEditModal = (newTitle: string) => {
@@ -210,20 +258,45 @@ const App: React.FC = () => {
 
   const submitDayEnd = async (rating: boolean) => {
     setLoadingMsg("正在为你总结今日...");
-    const summary = await generateDayEndReflection(currentDay.tasks, rating);
+    const summary = await generateJournalEntry(currentDay.tasks, rating);
     setLoadingMsg(null);
+
     setState((prev: AppState | null) => {
       if (!prev) return prev;
       return {
         ...prev,
-        currentDay: { ...prev.currentDay, dayRating: rating, dayReflection: summary }
+        currentDay: {
+          ...prev.currentDay,
+          dayRating: rating,
+          journalEntry: summary,
+          journalCreatedAt: new Date().toISOString(),
+        },
+        currentView: 'journal',
       };
     });
   };
 
-  const bigTasks = currentDay.tasks.filter((t: Task) => t.size === 'big');
-  const smallTasks = currentDay.tasks.filter((t: Task) => t.size === 'small');
-  const activeReflectingTask = currentDay.tasks.find((t: Task) => t.id === reflectingTaskId);
+  // Render different views
+  if (currentView === 'journal') {
+    return (
+      <JournalPage
+        tasks={currentDay.tasks}
+        rating={currentDay.dayRating || false}
+        journalEntry={currentDay.journalEntry || ''}
+        onSaveJournal={handleSaveJournal}
+        onBack={() => navigateTo('working')}
+      />
+    );
+  }
+
+  if (currentView === 'history') {
+    return (
+      <HistoryPage
+        history={history}
+        onBack={() => navigateTo(currentDay.isStarted ? 'working' : 'planning')}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#fcfcfc] text-zinc-900 flex flex-col items-center">
@@ -393,7 +466,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {isStarted && (
+        {isStarted && !isDayFinished && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in fade-in duration-700">
             <div className="flex flex-col gap-6">
               <h3 className="text-xs font-black text-rose-500 uppercase tracking-[0.3em] px-4 flex items-center gap-2">
@@ -431,7 +504,7 @@ const App: React.FC = () => {
                 />
               ))}
 
-              {allDone && !isDayFinished && (
+              {allDone && (
                 <div className="mt-6 bg-zinc-900 text-white p-10 rounded-[3.5rem] shadow-2xl animate-in zoom-in duration-700">
                   <h2 className="text-2xl font-bold mb-8 seriftitle text-center leading-tight">今天的仗打完了，<br/>感觉如何？</h2>
                   <div className="flex gap-4">
@@ -444,29 +517,24 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {isDayFinished && (
-          <section className="max-w-3xl mx-auto w-full bg-white border border-zinc-100 p-12 rounded-[4rem] shadow-sm animate-in fade-in duration-1000">
-             <div className="flex items-center gap-3 mb-8">
-                <div className={`w-4 h-4 rounded-full ${currentDay.dayRating ? 'bg-emerald-400' : 'bg-rose-400 animate-pulse'}`}></div>
-                <span className="text-xs font-black tracking-[0.4em] uppercase text-zinc-300">今日复盘报告</span>
-             </div>
-             <p className="text-2xl md:text-3xl seriftitle leading-relaxed mb-12 italic text-zinc-800">
-               "{currentDay.dayReflection}"
-             </p>
-             <div className="flex flex-col sm:flex-row gap-4 pt-10 border-t border-zinc-50">
-                <button onClick={() => exportToMarkdown([currentDay, ...state.history])} className="flex-1 py-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest border border-zinc-100 rounded-2xl hover:bg-zinc-50 transition-colors">Export Markdown</button>
-                <button onClick={() => exportToCSV([currentDay, ...state.history])} className="flex-1 py-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest border border-zinc-100 rounded-2xl hover:bg-zinc-50 transition-colors">Export CSV</button>
-                <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="flex-1 py-4 text-[10px] font-bold text-rose-200 uppercase tracking-widest hover:text-rose-500 transition-colors">Reset All</button>
-             </div>
-          </section>
+        {isDayFinished && currentView === 'working' && (
+          <JournalPage
+            tasks={currentDay.tasks}
+            rating={currentDay.dayRating || false}
+            journalEntry={currentDay.journalEntry || ''}
+            onSaveJournal={handleSaveJournal}
+            onBack={() => {}}
+          />
         )}
       </main>
 
       <footer className="w-full max-w-6xl px-6 py-10 flex justify-between items-center text-[10px] font-black text-zinc-300 uppercase tracking-[0.3em] border-t border-zinc-50">
         <div>STABLE RELATIONS</div>
         <div className="flex gap-10">
-          {state.history.length > 0 && <button className="hover:text-zinc-500 transition-colors">PAST JOURNEYS ({state.history.length})</button>}
-          <span>V1.0</span>
+          <button onClick={() => navigateTo('history')} className="hover:text-zinc-500 transition-colors">
+            PAST JOURNEYS ({history.length})
+          </button>
+          <span>V2.0</span>
         </div>
       </footer>
 

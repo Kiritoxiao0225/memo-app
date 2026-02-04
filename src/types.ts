@@ -13,14 +13,19 @@ export interface Task {
 
 export interface DayRecord {
   date: string;
-  tasks: Task[]; // The active 3 tasks
-  inbox: Task[]; // The pool of potential tasks
-  isStarted: boolean; // Whether the user has confirmed their 3 things
+  tasks: Task[];
+  inbox: Task[];
+  isStarted: boolean;
   dayReflection?: string;
   dayRating?: boolean;
+  // 新增：日记相关字段
+  journalEntry?: string;  // AI 生成的日记内容
+  journalCreatedAt?: string;  // 日记创建时间
+  isAllCompleted?: boolean;  // 是否全部完成
 }
 
 export interface AppState {
   currentDay: DayRecord;
   history: DayRecord[];
+  currentView: 'planning' | 'working' | 'journal' | 'history';
 }

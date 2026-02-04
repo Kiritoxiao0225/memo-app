@@ -21,7 +21,8 @@ export const loadState = (): AppState => {
   if (!data) {
     return {
       currentDay: createNewDay(today),
-      history: []
+      history: [],
+      currentView: 'planning'
     };
   }
 
@@ -32,7 +33,8 @@ export const loadState = (): AppState => {
     const newHistory = [parsed.currentDay, ...parsed.history];
     return {
       currentDay: createNewDay(today),
-      history: newHistory
+      history: newHistory,
+      currentView: 'planning'
     };
   }
 
@@ -40,6 +42,11 @@ export const loadState = (): AppState => {
   if (parsed.currentDay.inbox === undefined) {
     parsed.currentDay.inbox = [];
     parsed.currentDay.isStarted = parsed.currentDay.tasks.length === 3;
+  }
+
+  // Ensure currentView exists
+  if (!parsed.currentView) {
+    parsed.currentView = 'planning';
   }
 
   return parsed;
