@@ -91,6 +91,12 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
       const { currentDay, history } = checkAndSwitchDay(data.currentDay, data.history || []);
       data = { ...data, currentDay, history };
 
+      // If all tasks are completed and rated, auto-navigate to history
+      const allDone = currentDay.isStarted && currentDay.tasks.length > 0 && currentDay.tasks.every((t) => t.isDone);
+      if (allDone && currentDay.dayRating !== undefined) {
+        data.currentView = 'history';
+      }
+
       // Reset dayRating and journalEntry when starting a new session on the same day
       if (data.currentDay.dayRating !== undefined) {
         delete data.currentDay.dayRating;

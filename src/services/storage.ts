@@ -53,8 +53,11 @@ export const loadState = (): AppState => {
     parsed.currentDay.isStarted = parsed.currentDay.tasks.length === 3;
   }
 
-  // Ensure currentView exists
-  if (!parsed.currentView) {
+  // If all tasks are completed and rated, auto-navigate to history
+  const allDone = parsed.currentDay.isStarted && parsed.currentDay.tasks.length > 0 && parsed.currentDay.tasks.every((t: any) => t.isDone);
+  if (allDone && parsed.currentDay.dayRating !== undefined) {
+    parsed.currentView = 'history';
+  } else if (!parsed.currentView) {
     parsed.currentView = 'planning';
   }
 
