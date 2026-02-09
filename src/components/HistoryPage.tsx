@@ -1,13 +1,16 @@
 
 import React, { useState } from 'react';
-import { DayRecord } from '../types';
+import { DayRecord, Task } from '../types';
 
 interface HistoryPageProps {
   history: DayRecord[];
   onBack: () => void;
+  onUpdateTask?: (date: string, taskId: string, updates: Partial<Task>) => void;
+  onUpdateJournal?: (date: string, journalEntry: string) => void;
+  onDeleteDay?: (date: string) => void;
 }
 
-const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack }) => {
+const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack, onUpdateTask, onUpdateJournal, onDeleteDay }) => {
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
   const formatDate = (dateStr: string) => {
@@ -20,24 +23,39 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack }) => {
     });
   };
 
+  // 合并 tasks 和 inbox 中的任务（兼容旧数据）
+  const getAllTasks = (day: DayRecord): Task[] => {
+    const allTasks = [...day.tasks, ...day.inbox];
+    // 去重
+    const seen = new Set<string>();
+    return allTasks.filter(t => {
+      if (seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+  };
+
   const getBigCompletionRate = (day: DayRecord) => {
-    const bigTasks = day.tasks.filter(t => t.size === 'big');
+    const allTasks = getAllTasks(day);
+    const bigTasks = allTasks.filter(t => t.size === 'big');
     if (bigTasks.length === 0) return null;
     const completed = bigTasks.filter(t => t.isDone).length;
     return Math.round((completed / bigTasks.length) * 100);
   };
 
   const getSmallCompletionRate = (day: DayRecord) => {
-    const smallTasks = day.tasks.filter(t => t.size === 'small');
+    const allTasks = getAllTasks(day);
+    const smallTasks = allTasks.filter(t => t.size === 'small');
     if (smallTasks.length === 0) return null;
     const completed = smallTasks.filter(t => t.isDone).length;
     return Math.round((completed / smallTasks.length) * 100);
   };
 
   const getOverallCompletionRate = (day: DayRecord) => {
-    if (day.tasks.length === 0) return 0;
-    const completed = day.tasks.filter(t => t.isDone).length;
-    return Math.round((completed / day.tasks.length) * 100);
+    const allTasks = getAllTasks(day);
+    if (allTasks.length === 0) return 0;
+    const completed = allTasks.filter(t => t.isDone).length;
+    return Math.round((completed / allTasks.length) * 100);
   };
 
   return (
@@ -82,15 +100,16 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack }) => {
               const bigRate = getBigCompletionRate(day);
               const smallRate = getSmallCompletionRate(day);
               const isExpanded = expandedDay === day.date;
-              const bigTasks = day.tasks.filter(t => t.size === 'big');
-              const smallTasks = day.tasks.filter(t => t.size === 'small');
+              const allTasks = getAllTasks(day);
+              const bigTasks = allTasks.filter(t => t.size === 'big');
+              const smallTasks = allTasks.filter(t => t.size === 'small');
 
               return (
                 <div
                   key={day.date}
                   className="bg-white border border-zinc-100 rounded-[2rem] overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                 >
-                  {/* Day Header */}
+                  {/* Day Header - 整个头部可点击 */}
                   <button
                     onClick={() => setExpandedDay(isExpanded ? null : day.date)}
                     className="w-full p-6 flex items-center justify-between text-left"
@@ -141,10 +160,15 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack }) => {
                           </h4>
                           <div className="flex flex-col gap-2">
                             {bigTasks.map((task, idx) => (
-                              <div
+                              <button
                                 key={task.id}
-                                className={`flex items-start gap-3 p-4 rounded-xl ${
-                                  task.isDone ? 'bg-emerald-50' : 'bg-zinc-50'
+                                onClick={() => {
+                                  if (onUpdateTask) {
+                                    onUpdateTask(day.date, task.id, { isDone: !task.isDone });
+                                  }
+                                }}
+                                className={`flex items-start gap-3 p-4 rounded-xl transition-all text-left ${
+                                  task.isDone ? 'bg-emerald-50 hover:bg-emerald-100' : 'bg-zinc-50 hover:bg-zinc-100'
                                 }`}
                               >
                                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
@@ -178,7 +202,7 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack }) => {
                                     </div>
                                   )}
                                 </div>
-                              </div>
+                              </button>
                             ))}
                           </div>
                         </div>
@@ -193,10 +217,15 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack }) => {
                           </h4>
                           <div className="flex flex-col gap-2">
                             {smallTasks.map((task, idx) => (
-                              <div
+                              <button
                                 key={task.id}
-                                className={`flex items-start gap-3 p-3 rounded-xl ${
-                                  task.isDone ? 'bg-emerald-50' : 'bg-zinc-50'
+                                onClick={() => {
+                                  if (onUpdateTask) {
+                                    onUpdateTask(day.date, task.id, { isDone: !task.isDone });
+                                  }
+                                }}
+                                className={`flex items-start gap-3 p-3 rounded-xl transition-all text-left ${
+                                  task.isDone ? 'bg-emerald-50 hover:bg-emerald-100' : 'bg-zinc-50 hover:bg-zinc-100'
                                 }`}
                               >
                                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
@@ -225,21 +254,60 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack }) => {
                                     </div>
                                   )}
                                 </div>
-                              </div>
+                              </button>
                             ))}
                           </div>
                         </div>
                       )}
 
                       {/* Journal */}
-                      {day.journalEntry && (
-                        <div className="mt-6">
-                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">日记</h4>
+                      <div className="mt-6">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">日记</h4>
+                          {onUpdateJournal && (
+                            <button
+                              onClick={() => {
+                                const newEntry = window.prompt('编辑日记:', day.journalEntry || '');
+                                if (newEntry !== null) {
+                                  onUpdateJournal(day.date, newEntry);
+                                }
+                              }}
+                              className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors"
+                            >
+                              编辑
+                            </button>
+                          )}
+                        </div>
+                        {day.journalEntry ? (
                           <div className="p-5 bg-zinc-900 rounded-2xl text-white">
                             <p className="text-sm leading-relaxed font-medium italic">
                               {day.journalEntry}
                             </p>
                           </div>
+                        ) : (
+                          <div className="p-5 bg-zinc-50 rounded-2xl text-zinc-400 italic text-sm">
+                            暂无日记
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Delete Button */}
+                      {onDeleteDay && (
+                        <div className="mt-6 pt-4 border-t border-zinc-100 flex justify-center">
+                          <button
+                            onClick={() => {
+                              if (window.confirm('确定要删除这一天的记录吗？此操作不可恢复。')) {
+                                onDeleteDay(day.date);
+                                setExpandedDay(null);
+                              }
+                            }}
+                            className="text-xs text-zinc-300 hover:text-rose-500 transition-colors flex items-center gap-1"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                            删除记录
+                          </button>
                         </div>
                       )}
                     </div>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Task, AppState } from './types';
+import { Task, AppState, DayRecord } from './types';
 import { subscribeToData, saveState } from './services/firebaseStorage';
 import { generateEncouragement, generateJournalEntry } from './services/deepseekService';
 import ReflectionModal from './components/ReflectionModal';
@@ -58,12 +58,15 @@ const App: React.FC = () => {
 
   const { currentDay, currentView, history } = state;
   const isStarted = currentDay.isStarted;
-  const allDone = isStarted && currentDay.tasks.length > 0 && currentDay.tasks.every((t: Task) => t.isDone);
   const isDayFinished = !!currentDay.dayRating || currentView === 'journal';
 
   const bigTasks = currentDay.tasks.filter((t: Task) => t.size === 'big');
   const smallTasks = currentDay.tasks.filter((t: Task) => t.size === 'small');
   const activeReflectingTask = currentDay.tasks.find((t: Task) => t.id === reflectingTaskId);
+
+  const allBigDone = isStarted && bigTasks.length > 0 && bigTasks.every((t: Task) => t.isDone);
+  const allDone = isStarted && currentDay.tasks.length > 0 && currentDay.tasks.every((t: Task) => t.isDone);
+  const hasUndoneSmallTasks = isStarted && smallTasks.some((t: Task) => !t.isDone);
 
   // Navigation functions
   const navigateTo = (view: 'planning' | 'working' | 'journal' | 'history') => {
@@ -100,6 +103,9 @@ const App: React.FC = () => {
 
     const today = new Date().toISOString().split('T')[0];
 
+    // 检查是否有未完成的小事需要流转到下一天
+    const undoneSmallTasks = currentDay.tasks.filter((t: Task) => t.size === 'small' && !t.isDone);
+
     setState((prev: AppState | null) => {
       if (!prev) return prev;
 
@@ -107,21 +113,50 @@ const App: React.FC = () => {
       const existingHistoryIndex = prev.history.findIndex(day => day.date === today);
 
       let newHistory = [...prev.history];
+      const journalData = {
+        journalEntry: entry,
+        journalCreatedAt: new Date().toISOString(),
+      };
 
       if (existingHistoryIndex >= 0) {
         // 更新已有的今天记录
         newHistory[existingHistoryIndex] = {
-          ...prev.currentDay,
-          journalEntry: entry,
-          journalCreatedAt: new Date().toISOString(),
+          ...prev.history[existingHistoryIndex],
+          ...journalData,
         };
       } else {
         // 添加新记录
         newHistory = [{
           ...prev.currentDay,
-          journalEntry: entry,
-          journalCreatedAt: new Date().toISOString(),
+          ...journalData,
         }, ...prev.history];
+      }
+
+      // 如果有未完成的小事，流转到下一天
+      if (undoneSmallTasks.length > 0) {
+        // 生成新的任务列表（清除完成状态和复盘）
+        const rolloverTasks: Task[] = undoneSmallTasks.map((t: Task) => ({
+          ...t,
+          isDone: false,
+          reflection: '',
+          doneAt: undefined,
+          encouragement: undefined,
+        }));
+
+        return {
+          ...prev,
+          history: newHistory,
+          currentDay: {
+            date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+            tasks: [],
+            inbox: rolloverTasks,
+            isStarted: false,
+            dayRating: undefined,
+            journalEntry: undefined,
+            journalCreatedAt: undefined,
+          },
+          currentView: 'history',
+        };
       }
 
       return {
@@ -129,8 +164,7 @@ const App: React.FC = () => {
         history: newHistory,
         currentDay: {
           ...prev.currentDay,
-          journalEntry: entry,
-          journalCreatedAt: new Date().toISOString(),
+          ...journalData,
         },
         currentView: 'history',
       };
@@ -311,11 +345,54 @@ const App: React.FC = () => {
     );
   }
 
+  const handleUpdateHistoryTask = (date: string, taskId: string, updates: Partial<Task>) => {
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      const newHistory = prev.history.map((day: DayRecord) => {
+        if (day.date !== date) return day;
+        // 查找任务是否在 tasks 或 inbox 中
+        const taskInTasks = day.tasks.find(t => t.id === taskId);
+        const taskInInbox = day.inbox.find(t => t.id === taskId);
+
+        return {
+          ...day,
+          // 如果任务在 tasks 中，更新 tasks
+          tasks: taskInTasks ? day.tasks.map((t: Task) => t.id === taskId ? { ...t, ...updates } : t) : day.tasks,
+          // 如果任务在 inbox 中，更新 inbox
+          inbox: taskInInbox ? day.inbox.map((t: Task) => t.id === taskId ? { ...t, ...updates } : t) : day.inbox,
+        };
+      });
+      return { ...prev, history: newHistory };
+    });
+  };
+
+  const handleUpdateHistoryJournal = (date: string, journalEntry: string) => {
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      const newHistory = prev.history.map((day: DayRecord) => {
+        if (day.date !== date) return day;
+        return { ...day, journalEntry, journalCreatedAt: new Date().toISOString() };
+      });
+      return { ...prev, history: newHistory };
+    });
+  };
+
+  const handleDeleteHistoryDay = (date: string) => {
+    setState((prev: AppState | null) => {
+      if (!prev) return prev;
+      const newHistory = prev.history.filter((day: DayRecord) => day.date !== date);
+      return { ...prev, history: newHistory };
+    });
+  };
+
   if (currentView === 'history') {
     return (
       <HistoryPage
         history={history}
         onBack={() => navigateTo(currentDay.isStarted ? 'working' : 'planning')}
+        onUpdateTask={handleUpdateHistoryTask}
+        onUpdateJournal={handleUpdateHistoryJournal}
+        onDeleteDay={handleDeleteHistoryDay}
       />
     );
   }
@@ -566,6 +643,19 @@ const App: React.FC = () => {
                     <button onClick={() => submitDayEnd(true)} className="flex-1 py-5 bg-white text-zinc-900 font-bold rounded-2xl hover:bg-emerald-50 transition-colors">过得去</button>
                     <button onClick={() => submitDayEnd(false)} className="flex-1 py-5 bg-white/10 text-white font-bold rounded-2xl hover:bg-rose-500 transition-colors">不尽兴</button>
                   </div>
+                </div>
+              )}
+
+              {/* 进入总结按钮 - 大事完成但还有小事未完成时显示 */}
+              {!isDayFinished && allBigDone && !allDone && hasUndoneSmallTasks && (
+                <div className="mt-6 bg-white border border-zinc-200 p-6 rounded-[2.5rem] shadow-sm animate-in zoom-in duration-700">
+                  <p className="text-center text-zinc-500 mb-4">所有大事已完成，小事还有 {smallTasks.filter(t => !t.isDone).length} 项未完成</p>
+                  <button
+                    onClick={() => submitDayEnd(true)}
+                    className="w-full py-4 bg-zinc-900 text-white font-bold rounded-2xl hover:bg-zinc-800 transition-colors"
+                  >
+                    进入总结，结束今天
+                  </button>
                 </div>
               )}
             </div>
