@@ -148,13 +148,16 @@ const App: React.FC = () => {
           encouragement: undefined,
         }));
 
-        setTimeout(() => setRolloverCount(undoneSmallTasksFromInbox.length), 100);
+        setTimeout(() => setRolloverCount(allUndoneSmallTasks.length), 100);
+
+        // 明天：直接使用与 checkAndSwitchDay 相同的方式计算
+        const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
         return {
           ...prev,
           history: newHistory,
           currentDay: {
-            date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+            date: tomorrow,
             tasks: [],
             inbox: rolloverTasks,
             isStarted: false,
