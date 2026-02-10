@@ -103,8 +103,10 @@ const App: React.FC = () => {
 
     const today = new Date().toISOString().split('T')[0];
 
-    // 检查是否有未完成的小事需要流转到下一天
+    // 检查是否有未完成的小事需要流转到下一天（同时从 tasks 和 inbox 中获取）
     const undoneSmallTasks = currentDay.tasks.filter((t: Task) => t.size === 'small' && !t.isDone);
+    const undoneSmallTasksFromInbox = currentDay.inbox.filter((t: Task) => t.size === 'small' && !t.isDone);
+    const allUndoneSmallTasks = [...undoneSmallTasks, ...undoneSmallTasksFromInbox];
 
     setState((prev: AppState | null) => {
       if (!prev) return prev;
@@ -133,9 +135,9 @@ const App: React.FC = () => {
       }
 
       // 如果有未完成的小事，流转到下一天
-      if (undoneSmallTasks.length > 0) {
+      if (allUndoneSmallTasks.length > 0) {
         // 生成新的任务列表（清除完成状态和复盘）
-        const rolloverTasks: Task[] = undoneSmallTasks.map((t: Task) => ({
+        const rolloverTasks: Task[] = allUndoneSmallTasks.map((t: Task) => ({
           ...t,
           isDone: false,
           reflection: '',
