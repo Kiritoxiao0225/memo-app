@@ -135,7 +135,7 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
 
       // Only update if date actually changed (to avoid infinite loop)
       if (currentDay.date !== data.currentDay.date) {
-        data = { ...data, currentDay, history };
+        data = { ...data, currentDay, history, currentView: 'planning' };
         localInboxCount = data.currentDay.inbox.length;
         localTasksCount = data.currentDay.tasks.length;
 
@@ -164,12 +164,6 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
           localTasksCount = data.currentDay.tasks.length;
         }
         // If Firebase has less or equal data, skip update to preserve local changes
-      }
-
-      // If all tasks are completed and rated, auto-navigate to history
-      const allDone = currentDay.isStarted && currentDay.tasks.length > 0 && currentDay.tasks.every((t) => t.isDone);
-      if (allDone && currentDay.dayRating !== undefined) {
-        data.currentView = 'history';
       }
 
       callback(data);
@@ -222,7 +216,7 @@ export const loadState = async (): Promise<AppState> => {
 
     // Only save if date actually changed
     if (currentDay.date !== data.currentDay.date) {
-      data = { ...data, currentDay, history };
+      data = { ...data, currentDay, history, currentView: 'planning' };
 
       // Reset dayRating and journalEntry when starting a new session on the same day
       if (data.currentDay.dayRating !== undefined) {
