@@ -1,6 +1,6 @@
 
 import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, Firestore } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, Firestore, deleteDoc } from 'firebase/firestore';
 import { AppState, DayRecord, Task } from '../types';
 import { saveState as saveToLocal, loadState as loadFromLocal } from './storage';
 
@@ -141,6 +141,9 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
         delete data.currentDay.journalEntry;
       }
 
+      // Force save by deleting first, then setting (to ensure Firebase triggers the write)
+      // This is needed because Firebase may optimize away writes when data appears unchanged
+      await deleteDoc(docRef);
       await setDoc(docRef, data);
       callback(data);
       isInitialLoad = false;
@@ -199,6 +202,8 @@ export const loadState = async (): Promise<AppState> => {
       delete data.currentDay.journalEntry;
     }
 
+    // Force save by deleting first, then setting (to ensure Firebase triggers the write)
+    await deleteDoc(docRef);
     await setDoc(docRef, data);
     return data;
   }
