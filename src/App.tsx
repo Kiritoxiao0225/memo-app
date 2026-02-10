@@ -275,17 +275,19 @@ const App: React.FC = () => {
     if (tasksToUse.length === 0 && history.length > 0) {
       const mostRecentDay = history[0];
       const undoneSmallTasks: Task[] = [];
+      const seenTaskIds = new Set<string>();
 
       // Check tasks
       mostRecentDay.tasks.forEach((t: Task) => {
         if (t.size === 'small' && !t.isDone) {
           undoneSmallTasks.push({ ...t, id: crypto.randomUUID(), isDone: false, reflection: '', doneAt: undefined, encouragement: undefined });
+          seenTaskIds.add(t.id);
         }
       });
 
-      // Check inbox
+      // Check inbox (去重)
       mostRecentDay.inbox.forEach((t: Task) => {
-        if (t.size === 'small' && !t.isDone) {
+        if (t.size === 'small' && !t.isDone && !seenTaskIds.has(t.id)) {
           undoneSmallTasks.push({ ...t, id: crypto.randomUUID(), isDone: false, reflection: '', doneAt: undefined, encouragement: undefined });
         }
       });

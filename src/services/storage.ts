@@ -27,6 +27,7 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
     // 从最后一条历史记录中获取未完成的小事，流转到下一天
     const lastDayRecord = currentDay;
     const undoneSmallTasks: Task[] = [];
+    const seenTaskIds = new Set<string>();
 
     // 从 tasks 中获取未完成的小事
     if (lastDayRecord.tasks) {
@@ -40,14 +41,15 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
             doneAt: undefined,
             encouragement: undefined,
           });
+          seenTaskIds.add(t.id); // 记录原始 id
         }
       });
     }
 
-    // 从 inbox 中获取未完成的小事
+    // 从 inbox 中获取未完成的小事（去重）
     if (lastDayRecord.inbox) {
       lastDayRecord.inbox.forEach((t: Task) => {
-        if (t.size === 'small' && !t.isDone) {
+        if (t.size === 'small' && !t.isDone && !seenTaskIds.has(t.id)) {
           undoneSmallTasks.push({
             ...t,
             id: crypto.randomUUID(), // 生成新的 id
@@ -60,7 +62,7 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
       });
     }
 
-    const newToday = createNewDay(today);
+    const newToday = createNewDay(todayStr);
 
     // 如果有未完成的小事，添加到今天的 inbox
     if (undoneSmallTasks.length > 0) {
