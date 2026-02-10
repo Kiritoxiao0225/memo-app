@@ -20,6 +20,14 @@ const App: React.FC = () => {
   // 流转提示
   const [rolloverCount, setRolloverCount] = useState(0);
 
+  // 自动隐藏流转提示
+  useEffect(() => {
+    if (rolloverCount > 0) {
+      const timer = setTimeout(() => setRolloverCount(0), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [rolloverCount]);
+
   // Inline editing state for the Thinking Pool
   const [editingInboxId, setEditingInboxId] = useState<string | null>(null);
   const [editingInboxValue, setEditingInboxValue] = useState('');
