@@ -102,6 +102,11 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
 // Use localStorage fallback
 const useLocalStorage = () => !db;
 
+// Track local state for comparison (to avoid overwriting user updates)
+let localInboxCount = 0;
+let localTasksCount = 0;
+
+// Flag to indicate initial load
 let isInitialLoad = true;
 
 export const subscribeToData = (callback: (state: AppState) => void) => {
@@ -129,6 +134,8 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
       // Only update if date actually changed (to avoid infinite loop)
       if (currentDay.date !== data.currentDay.date) {
         data = { ...data, currentDay, history };
+        localInboxCount = data.currentDay.inbox.length;
+        localTasksCount = data.currentDay.tasks.length;
 
         // Reset dayRating and journalEntry when starting a new session on the same day
         if (data.currentDay.dayRating !== undefined) {
@@ -143,8 +150,18 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
 
         await setDoc(docRef, data);
       } else {
-        // Just update state without saving
-        data = { ...data, currentDay, history };
+        // Just update local counters from Firebase data
+        const fbInboxCount = data.currentDay.inbox.length;
+        const fbTasksCount = data.currentDay.tasks.length;
+
+        // Only update state if Firebase has more data than local
+        // This prevents overwriting user-added content
+        if (fbInboxCount > localInboxCount || fbTasksCount > localTasksCount) {
+          data = { ...data, currentDay, history };
+          localInboxCount = data.currentDay.inbox.length;
+          localTasksCount = data.currentDay.tasks.length;
+        }
+        // If Firebase has less or equal data, skip update to preserve local changes
       }
 
       // If all tasks are completed and rated, auto-navigate to history
