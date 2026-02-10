@@ -11,10 +11,27 @@ interface HistoryPageProps {
 }
 
 const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack, onUpdateTask, onUpdateJournal, onDeleteDay }) => {
-  const [expandedDay, setExpandedDay] = useState<string | null>(null);
+  // 使用 Set 存储多个展开的日期
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+
+  const isExpanded = (date: string) => expandedDays.has(date);
+
+  const toggleExpanded = (date: string) => {
+    setExpandedDays(prev => {
+      const next = new Set(prev);
+      if (next.has(date)) {
+        next.delete(date);
+      } else {
+        next.add(date);
+      }
+      return next;
+    });
+  };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    // 直接解析 YYYY-MM-DD 格式，避免时区问题
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('zh-CN', {
       year: 'numeric',
       month: 'long',
@@ -99,7 +116,7 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack, onUpdateTask
               const overallRate = getOverallCompletionRate(day);
               const bigRate = getBigCompletionRate(day);
               const smallRate = getSmallCompletionRate(day);
-              const isExpanded = expandedDay === day.date;
+              const dayExpanded = isExpanded(day.date);
               const allTasks = getAllTasks(day);
               const bigTasks = allTasks.filter(t => t.size === 'big');
               const smallTasks = allTasks.filter(t => t.size === 'small');
@@ -111,7 +128,7 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack, onUpdateTask
                 >
                   {/* Day Header - 整个头部可点击 */}
                   <button
-                    onClick={() => setExpandedDay(isExpanded ? null : day.date)}
+                    onClick={() => toggleExpanded(day.date)}
                     className="w-full p-6 flex items-center justify-between text-left"
                   >
                     <div className="flex items-center gap-4">
@@ -139,7 +156,7 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack, onUpdateTask
                       </div>
                     </div>
                     <svg
-                      className={`w-5 h-5 text-zinc-300 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      className={`w-5 h-5 text-zinc-300 transition-transform ${dayExpanded ? 'rotate-180' : ''}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -149,7 +166,7 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack, onUpdateTask
                   </button>
 
                   {/* Expanded Content */}
-                  {isExpanded && (
+                  {dayExpanded && (
                     <div className="px-6 pb-6 border-t border-zinc-50 animate-in fade-in slide-in-from-top-2 duration-300">
                       {/* Big Tasks */}
                       {bigTasks.length > 0 && (
@@ -298,7 +315,6 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack, onUpdateTask
                             onClick={() => {
                               if (window.confirm('确定要删除这一天的记录吗？此操作不可恢复。')) {
                                 onDeleteDay(day.date);
-                                setExpandedDay(null);
                               }
                             }}
                             className="text-xs text-zinc-300 hover:text-rose-500 transition-colors flex items-center gap-1"
