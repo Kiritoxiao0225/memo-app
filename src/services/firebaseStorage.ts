@@ -1,7 +1,7 @@
 
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc, onSnapshot, Firestore } from 'firebase/firestore';
-import { AppState, DayRecord } from '../types';
+import { AppState, DayRecord, Task } from '../types';
 import { saveState as saveToLocal, loadState as loadFromLocal } from './storage';
 
 const firebaseConfig = {
@@ -53,8 +53,44 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
   if (currentDay.date !== today) {
     if (currentDay.isStarted || currentDay.tasks.length > 0 || currentDay.inbox.length > 0) {
       const newHistory = [currentDay, ...history];
+
+      // 从 currentDay 中获取未完成的小事，流转到下一天
+      const undoneSmallTasks: Task[] = [];
+
+      // 从 tasks 中获取未完成的小事
+      currentDay.tasks.forEach((t) => {
+        if (t.size === 'small' && !t.isDone) {
+          undoneSmallTasks.push({
+            ...t,
+            isDone: false,
+            reflection: '',
+            doneAt: undefined,
+            encouragement: undefined,
+          });
+        }
+      });
+
+      // 从 inbox 中获取未完成的小事
+      currentDay.inbox.forEach((t) => {
+        if (t.size === 'small' && !t.isDone) {
+          undoneSmallTasks.push({
+            ...t,
+            isDone: false,
+            reflection: '',
+            doneAt: undefined,
+            encouragement: undefined,
+          });
+        }
+      });
+
+      const newToday = createNewDay(today);
+      // 如果有未完成的小事，添加到今天的 inbox
+      if (undoneSmallTasks.length > 0) {
+        newToday.inbox = undoneSmallTasks;
+      }
+
       return {
-        currentDay: createNewDay(today),
+        currentDay: newToday,
         history: newHistory,
       };
     }

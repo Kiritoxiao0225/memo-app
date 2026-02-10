@@ -1,5 +1,5 @@
 
-import { DayRecord, AppState } from '../types';
+import { DayRecord, Task, AppState } from '../types';
 
 const STORAGE_KEY = 'memo_app_data';
 
@@ -31,8 +31,50 @@ export const loadState = (): AppState => {
   // If it's a new day, move current to history
   if (parsed.currentDay.date !== today) {
     const newHistory = [parsed.currentDay, ...parsed.history];
+
+    // 从最后一条历史记录中获取未完成的小事，流转到下一天
+    const lastDayRecord = parsed.currentDay;
+    const undoneSmallTasks: Task[] = [];
+
+    // 从 tasks 中获取未完成的小事
+    if (lastDayRecord.tasks) {
+      lastDayRecord.tasks.forEach((t: Task) => {
+        if (t.size === 'small' && !t.isDone) {
+          undoneSmallTasks.push({
+            ...t,
+            isDone: false,
+            reflection: '',
+            doneAt: undefined,
+            encouragement: undefined,
+          });
+        }
+      });
+    }
+
+    // 从 inbox 中获取未完成的小事
+    if (lastDayRecord.inbox) {
+      lastDayRecord.inbox.forEach((t: Task) => {
+        if (t.size === 'small' && !t.isDone) {
+          undoneSmallTasks.push({
+            ...t,
+            isDone: false,
+            reflection: '',
+            doneAt: undefined,
+            encouragement: undefined,
+          });
+        }
+      });
+    }
+
+    const newToday = createNewDay(today);
+
+    // 如果有未完成的小事，添加到今天的 inbox
+    if (undoneSmallTasks.length > 0) {
+      newToday.inbox = undoneSmallTasks;
+    }
+
     return {
-      currentDay: createNewDay(today),
+      currentDay: newToday,
       history: newHistory,
       currentView: 'planning'
     };
