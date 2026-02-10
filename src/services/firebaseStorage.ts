@@ -49,9 +49,14 @@ const createNewDay = (date: string): DayRecord => ({
 // Check if we need to switch to a new day
 // Modified: Always move currentDay to history when date changes, to ensure rollover of unfinished tasks
 const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { currentDay: DayRecord; history: DayRecord[] } => {
-  const today = new Date().toISOString().split('T')[0];
+  // 使用本地时区日期，避免时区问题
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
 
-  if (currentDay.date !== today) {
+  if (currentDay.date !== todayStr) {
     // Always move currentDay to history when switching to a new day (even if not started)
     const newHistory = [currentDay, ...history];
 
@@ -86,7 +91,7 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
       }
     });
 
-    const newToday = createNewDay(today);
+    const newToday = createNewDay(todayStr);
     // 如果有未完成的小事，添加到今天的 inbox
     if (undoneSmallTasks.length > 0) {
       newToday.inbox = undoneSmallTasks;
@@ -237,9 +242,14 @@ export const loadState = async (): Promise<AppState> => {
     return data;
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  // 使用本地时区日期，避免时区问题
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
   const defaultState: AppState = {
-    currentDay: createNewDay(today),
+    currentDay: createNewDay(todayStr),
     history: [],
     currentView: 'planning',
   };
