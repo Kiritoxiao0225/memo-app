@@ -101,10 +101,19 @@ export const loadState = (): AppState => {
 
   const parsed = JSON.parse(data);
 
-  // Apply day switch and rollover
-  const { currentDay, history } = checkAndSwitchDay(parsed.currentDay, parsed.history || []);
-  parsed.currentDay = currentDay;
-  parsed.history = history;
+  // 检查是否需要执行流转（只有日期变化且今天还没流转过才执行）
+  const needsRollover = parsed.currentDay.date !== todayStr && parsed.lastRolloverDate !== todayStr;
+
+  if (needsRollover) {
+    // 执行流转
+    const { currentDay, history } = checkAndSwitchDay(parsed.currentDay, parsed.history || []);
+    parsed.currentDay = currentDay;
+    parsed.history = history;
+    parsed.lastRolloverDate = todayStr;
+  } else {
+    // 如果今天已经流转过，只更新日期检查
+    parsed.history = parsed.history || [];
+  }
 
   // Reset dayRating and journalEntry when starting a new session on the same day
   if (parsed.currentDay.dayRating !== undefined) {
