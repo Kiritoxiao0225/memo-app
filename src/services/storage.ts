@@ -1,39 +1,26 @@
-
 import { DayRecord, Task, AppState } from '../types';
 
 const STORAGE_KEY = 'memo_app_data';
 
-export const saveState = (state: AppState) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-};
+// Create a new day record
+const createNewDay = (date: string): DayRecord => ({
+  date,
+  tasks: [],
+  inbox: [],
+  isStarted: false,
+});
 
-export const loadState = (): AppState => {
-  const data = localStorage.getItem(STORAGE_KEY);
+// Check if we need to switch to a new day
+// Modified: Always move currentDay to history when date changes, to ensure rollover of unfinished tasks
+const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { currentDay: DayRecord; history: DayRecord[] } => {
   const today = new Date().toISOString().split('T')[0];
 
-  const createNewDay = (date: string): DayRecord => ({
-    date,
-    tasks: [],
-    inbox: [],
-    isStarted: false,
-  });
-
-  if (!data) {
-    return {
-      currentDay: createNewDay(today),
-      history: [],
-      currentView: 'planning'
-    };
-  }
-
-  const parsed = JSON.parse(data);
-
-  // If it's a new day, move current to history
-  if (parsed.currentDay.date !== today) {
-    const newHistory = [parsed.currentDay, ...parsed.history];
+  if (currentDay.date !== today) {
+    // Always move currentDay to history when switching to a new day (even if not started)
+    const newHistory = [currentDay, ...history];
 
     // 从最后一条历史记录中获取未完成的小事，流转到下一天
-    const lastDayRecord = parsed.currentDay;
+    const lastDayRecord = currentDay;
     const undoneSmallTasks: Task[] = [];
 
     // 从 tasks 中获取未完成的小事
@@ -76,12 +63,36 @@ export const loadState = (): AppState => {
     return {
       currentDay: newToday,
       history: newHistory,
+    };
+  }
+
+  return { currentDay, history };
+};
+
+export const saveState = (state: AppState) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+};
+
+export const loadState = (): AppState => {
+  const data = localStorage.getItem(STORAGE_KEY);
+  const today = new Date().toISOString().split('T')[0];
+
+  if (!data) {
+    return {
+      currentDay: createNewDay(today),
+      history: [],
       currentView: 'planning'
     };
   }
 
+  const parsed = JSON.parse(data);
+
+  // Apply day switch and rollover
+  const { currentDay, history } = checkAndSwitchDay(parsed.currentDay, parsed.history || []);
+  parsed.currentDay = currentDay;
+  parsed.history = history;
+
   // Reset dayRating and journalEntry when starting a new session on the same day
-  // This allows users to re-do their day evaluation if they haven't switched days
   if (parsed.currentDay.dayRating !== undefined) {
     delete parsed.currentDay.dayRating;
   }

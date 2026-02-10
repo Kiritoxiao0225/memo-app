@@ -256,19 +256,61 @@ const App: React.FC = () => {
   };
 
   const startDay = () => {
-    if (currentDay.inbox.length === 0) return;
-    const tasks: Task[] = currentDay.inbox.map((task: Task, idx: number) => ({
+    // Check if we need to roll over unfinished small tasks from the most recent incomplete day
+    let tasksToUse = [...currentDay.inbox];
+
+    // If inbox is empty, check the most recent day in history for unfinished small tasks
+    if (tasksToUse.length === 0 && history.length > 0) {
+      const mostRecentDay = history[0];
+      const undoneSmallTasks: Task[] = [];
+
+      // Check tasks
+      mostRecentDay.tasks.forEach((t: Task) => {
+        if (t.size === 'small' && !t.isDone) {
+          undoneSmallTasks.push({ ...t, isDone: false, reflection: '', doneAt: undefined, encouragement: undefined });
+        }
+      });
+
+      // Check inbox
+      mostRecentDay.inbox.forEach((t: Task) => {
+        if (t.size === 'small' && !t.isDone) {
+          undoneSmallTasks.push({ ...t, isDone: false, reflection: '', doneAt: undefined, encouragement: undefined });
+        }
+      });
+
+      if (undoneSmallTasks.length > 0) {
+        tasksToUse = undoneSmallTasks;
+        setRolloverCount(undoneSmallTasks.length);
+      }
+    }
+
+    if (tasksToUse.length === 0) return;
+
+    const tasks: Task[] = tasksToUse.map((task: Task, idx: number) => ({
       ...task,
       size: idx < 3 ? 'big' : 'small'
     }));
-    setState((prev: AppState | null) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        currentDay: { ...prev.currentDay, tasks, isStarted: true },
-        currentView: 'working'
-      };
-    });
+
+    // If we rolled over tasks, update the inbox first
+    if (history.length > 0 && currentDay.inbox.length === 0) {
+      setState((prev: AppState | null) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          currentDay: { ...prev.currentDay, tasks, inbox: tasksToUse, isStarted: true },
+          currentView: 'working'
+        };
+      });
+    } else {
+      setState((prev: AppState | null) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          currentDay: { ...prev.currentDay, tasks, isStarted: true },
+          currentView: 'working'
+        };
+      });
+    }
   };
 
   const saveEditModal = (newTitle: string) => {

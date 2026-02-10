@@ -47,56 +47,52 @@ const createNewDay = (date: string): DayRecord => ({
 });
 
 // Check if we need to switch to a new day
+// Modified: Always move currentDay to history when date changes, to ensure rollover of unfinished tasks
 const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { currentDay: DayRecord; history: DayRecord[] } => {
   const today = new Date().toISOString().split('T')[0];
 
   if (currentDay.date !== today) {
-    if (currentDay.isStarted || currentDay.tasks.length > 0 || currentDay.inbox.length > 0) {
-      const newHistory = [currentDay, ...history];
+    // Always move currentDay to history when switching to a new day (even if not started)
+    const newHistory = [currentDay, ...history];
 
-      // 从 currentDay 中获取未完成的小事，流转到下一天
-      const undoneSmallTasks: Task[] = [];
+    // 从 currentDay 中获取未完成的小事，流转到下一天
+    const undoneSmallTasks: Task[] = [];
 
-      // 从 tasks 中获取未完成的小事
-      currentDay.tasks.forEach((t) => {
-        if (t.size === 'small' && !t.isDone) {
-          undoneSmallTasks.push({
-            ...t,
-            isDone: false,
-            reflection: '',
-            doneAt: undefined,
-            encouragement: undefined,
-          });
-        }
-      });
-
-      // 从 inbox 中获取未完成的小事
-      currentDay.inbox.forEach((t) => {
-        if (t.size === 'small' && !t.isDone) {
-          undoneSmallTasks.push({
-            ...t,
-            isDone: false,
-            reflection: '',
-            doneAt: undefined,
-            encouragement: undefined,
-          });
-        }
-      });
-
-      const newToday = createNewDay(today);
-      // 如果有未完成的小事，添加到今天的 inbox
-      if (undoneSmallTasks.length > 0) {
-        newToday.inbox = undoneSmallTasks;
+    // 从 tasks 中获取未完成的小事
+    currentDay.tasks.forEach((t) => {
+      if (t.size === 'small' && !t.isDone) {
+        undoneSmallTasks.push({
+          ...t,
+          isDone: false,
+          reflection: '',
+          doneAt: undefined,
+          encouragement: undefined,
+        });
       }
+    });
 
-      return {
-        currentDay: newToday,
-        history: newHistory,
-      };
+    // 从 inbox 中获取未完成的小事
+    currentDay.inbox.forEach((t) => {
+      if (t.size === 'small' && !t.isDone) {
+        undoneSmallTasks.push({
+          ...t,
+          isDone: false,
+          reflection: '',
+          doneAt: undefined,
+          encouragement: undefined,
+        });
+      }
+    });
+
+    const newToday = createNewDay(today);
+    // 如果有未完成的小事，添加到今天的 inbox
+    if (undoneSmallTasks.length > 0) {
+      newToday.inbox = undoneSmallTasks;
     }
+
     return {
-      currentDay: createNewDay(today),
-      history,
+      currentDay: newToday,
+      history: newHistory,
     };
   }
 
@@ -106,11 +102,15 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
 // Use localStorage fallback
 const useLocalStorage = () => !db;
 
+let isInitialLoad = true;
+
 export const subscribeToData = (callback: (state: AppState) => void) => {
+  isInitialLoad = true;
   if (useLocalStorage()) {
     // Use localStorage
     const data = loadFromLocal();
     callback(data);
+    isInitialLoad = false;
     return () => {};
   }
 
@@ -143,6 +143,7 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
 
       await setDoc(docRef, data);
       callback(data);
+      isInitialLoad = false;
     } else {
       const today = new Date().toISOString().split('T')[0];
       const defaultState: AppState = {
@@ -152,6 +153,7 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
       };
       await setDoc(docRef, defaultState);
       callback(defaultState);
+      isInitialLoad = false;
     }
   });
 };
@@ -159,6 +161,11 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
 export const saveState = async (state: AppState): Promise<void> => {
   if (useLocalStorage()) {
     saveToLocal(state);
+    return;
+  }
+
+  // Don't save during initial load - let subscribeToData handle the initial save with day rollover
+  if (isInitialLoad) {
     return;
   }
 
