@@ -139,9 +139,10 @@ const App: React.FC = () => {
 
       // 如果有未完成的小事，流转到下一天
       if (allUndoneSmallTasks.length > 0) {
-        // 生成新的任务列表（清除完成状态和复盘）
+        // 生成新的任务列表（清除完成状态和复盘，并生成新的 id）
         const rolloverTasks: Task[] = allUndoneSmallTasks.map((t: Task) => ({
           ...t,
+          id: crypto.randomUUID(),
           isDone: false,
           reflection: '',
           doneAt: undefined,
@@ -270,14 +271,14 @@ const App: React.FC = () => {
       // Check tasks
       mostRecentDay.tasks.forEach((t: Task) => {
         if (t.size === 'small' && !t.isDone) {
-          undoneSmallTasks.push({ ...t, isDone: false, reflection: '', doneAt: undefined, encouragement: undefined });
+          undoneSmallTasks.push({ ...t, id: crypto.randomUUID(), isDone: false, reflection: '', doneAt: undefined, encouragement: undefined });
         }
       });
 
       // Check inbox
       mostRecentDay.inbox.forEach((t: Task) => {
         if (t.size === 'small' && !t.isDone) {
-          undoneSmallTasks.push({ ...t, isDone: false, reflection: '', doneAt: undefined, encouragement: undefined });
+          undoneSmallTasks.push({ ...t, id: crypto.randomUUID(), isDone: false, reflection: '', doneAt: undefined, encouragement: undefined });
         }
       });
 

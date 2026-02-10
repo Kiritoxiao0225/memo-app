@@ -29,6 +29,7 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
         if (t.size === 'small' && !t.isDone) {
           undoneSmallTasks.push({
             ...t,
+            id: crypto.randomUUID(), // 生成新的 id
             isDone: false,
             reflection: '',
             doneAt: undefined,
@@ -44,6 +45,7 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
         if (t.size === 'small' && !t.isDone) {
           undoneSmallTasks.push({
             ...t,
+            id: crypto.randomUUID(), // 生成新的 id
             isDone: false,
             reflection: '',
             doneAt: undefined,
