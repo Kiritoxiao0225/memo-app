@@ -1,4 +1,4 @@
-import { DayRecord, Task, AppState } from '../types';
+import { DayRecord, AppState } from '../types';
 
 const STORAGE_KEY = 'memo_app_data';
 
@@ -11,7 +11,8 @@ const createNewDay = (date: string): DayRecord => ({
 });
 
 // Check if we need to switch to a new day
-// Modified: Always move currentDay to history when date changes, to ensure rollover of unfinished tasks
+// 简化：只执行日期切换，不执行流转
+// 流转逻辑由 App.tsx 中的 startDay() 统一处理
 const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { currentDay: DayRecord; history: DayRecord[] } => {
   // 使用本地时区日期，避免时区问题
   const today = new Date();
@@ -21,54 +22,10 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
   const todayStr = `${year}-${month}-${day}`;
 
   if (currentDay.date !== todayStr) {
-    // Always move currentDay to history when switching to a new day (even if not started)
+    // 切换到新的一天，将当前天归档到历史
     const newHistory = [currentDay, ...history];
-
-    // 从最后一条历史记录中获取未完成的小事，流转到下一天
-    const lastDayRecord = currentDay;
-    const undoneSmallTasks: Task[] = [];
-    const seenTaskIds = new Set<string>();
-
-    // 从 tasks 中获取未完成的小事
-    if (lastDayRecord.tasks) {
-      lastDayRecord.tasks.forEach((t: Task) => {
-        if (t.size === 'small' && !t.isDone) {
-          undoneSmallTasks.push({
-            ...t,
-            id: crypto.randomUUID(), // 生成新的 id
-            isDone: false,
-            reflection: '',
-            doneAt: undefined,
-            encouragement: undefined,
-          });
-          seenTaskIds.add(t.id); // 记录原始 id
-        }
-      });
-    }
-
-    // 从 inbox 中获取未完成的小事（去重）
-    if (lastDayRecord.inbox) {
-      lastDayRecord.inbox.forEach((t: Task) => {
-        if (t.size === 'small' && !t.isDone && !seenTaskIds.has(t.id)) {
-          undoneSmallTasks.push({
-            ...t,
-            id: crypto.randomUUID(), // 生成新的 id
-            isDone: false,
-            reflection: '',
-            doneAt: undefined,
-            encouragement: undefined,
-          });
-        }
-      });
-    }
-
+    // 创建一个新的空记录（不流转任何任务）
     const newToday = createNewDay(todayStr);
-
-    // 如果有未完成的小事，添加到今天的 inbox
-    if (undoneSmallTasks.length > 0) {
-      newToday.inbox = undoneSmallTasks;
-    }
-
     return {
       currentDay: newToday,
       history: newHistory,

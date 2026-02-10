@@ -112,18 +112,15 @@ const App: React.FC = () => {
       return;
     }
 
-    const today = new Date().toISOString().split('T')[0];
-
-    // 检查是否有未完成的小事需要流转到下一天（同时从 tasks 和 inbox 中获取）
-    const undoneSmallTasks = currentDay.tasks.filter((t: Task) => t.size === 'small' && !t.isDone);
-    const undoneSmallTasksFromInbox = currentDay.inbox.filter((t: Task) => t.size === 'small' && !t.isDone);
-    const allUndoneSmallTasks = [...undoneSmallTasks, ...undoneSmallTasksFromInbox];
+    // 使用本地时区日期
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     setState((prev: AppState | null) => {
       if (!prev) return prev;
 
       // 检查历史中是否已有今天的记录
-      const existingHistoryIndex = prev.history.findIndex(day => day.date === today);
+      const existingHistoryIndex = prev.history.findIndex(day => day.date === todayStr);
 
       let newHistory = [...prev.history];
       const journalData = {
@@ -143,39 +140,6 @@ const App: React.FC = () => {
           ...prev.currentDay,
           ...journalData,
         }, ...prev.history];
-      }
-
-      // 如果有未完成的小事，流转到下一天
-      if (allUndoneSmallTasks.length > 0) {
-        // 生成新的任务列表（清除完成状态和复盘，并生成新的 id）
-        const rolloverTasks: Task[] = allUndoneSmallTasks.map((t: Task) => ({
-          ...t,
-          id: crypto.randomUUID(),
-          isDone: false,
-          reflection: '',
-          doneAt: undefined,
-          encouragement: undefined,
-        }));
-
-        setTimeout(() => setRolloverCount(allUndoneSmallTasks.length), 100);
-
-        // 明天：直接使用与 checkAndSwitchDay 相同的方式计算
-        const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-
-        return {
-          ...prev,
-          history: newHistory,
-          currentDay: {
-            date: tomorrow,
-            tasks: [],
-            inbox: rolloverTasks,
-            isStarted: false,
-            dayRating: undefined,
-            journalEntry: undefined,
-            journalCreatedAt: undefined,
-          },
-          currentView: 'planning',
-        };
       }
 
       return {
@@ -268,6 +232,79 @@ const App: React.FC = () => {
   };
 
   const startDay = () => {
+    // 如果已经评价过（isDayFinished），处理归档和流转
+    if (isDayFinished) {
+      // 收集所有任务（已完成 + 未完成）
+      const allTasks = [...currentDay.inbox];
+
+      // 分离已完成和未完成的任务
+      const doneTasks: Task[] = [];
+      const undoneTasks: Task[] = [];
+
+      allTasks.forEach((task: Task) => {
+        if (task.isDone) {
+          doneTasks.push(task);
+        } else {
+          undoneTasks.push({
+            ...task,
+            id: crypto.randomUUID(),
+            isDone: false,
+            reflection: '',
+            doneAt: undefined,
+            encouragement: undefined,
+          });
+        }
+      });
+
+      // 使用本地时区日期
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      // 归档今天的记录（包含已完成和未完成的任务）
+      const todayRecord: DayRecord = {
+        ...currentDay,
+        date: todayStr,
+        tasks: doneTasks,
+        inbox: undoneTasks,
+        isStarted: true,
+      };
+
+      // 更新历史记录（替换已有的今天记录或添加新记录）
+      const existingIndex = history.findIndex(day => day.date === todayStr);
+      const newHistory = existingIndex >= 0
+        ? history.map((day, idx) => idx === existingIndex ? todayRecord : day)
+        : [todayRecord, ...history];
+
+      // 计算明天的日期
+      const tomorrow = new Date(Date.now() + 86400000);
+      const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+      // 创建明天的记录
+      const tomorrowRecord: DayRecord = {
+        date: tomorrowStr,
+        tasks: [],
+        inbox: undoneTasks,
+        isStarted: false,
+      };
+
+      // 设置流转提示
+      if (undoneTasks.length > 0) {
+        setTimeout(() => setRolloverCount(undoneTasks.length), 100);
+      }
+
+      setState((prev: AppState | null) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          history: newHistory,
+          currentDay: tomorrowRecord,
+          currentView: 'planning',
+        };
+      });
+      return;
+    }
+
+    // 正常开始新的一天（未评价过）
     // Check if we need to roll over unfinished small tasks from the most recent incomplete day
     let tasksToUse = [...currentDay.inbox];
 
@@ -379,8 +416,6 @@ const App: React.FC = () => {
     const summary = await generateJournalEntry(currentDay.tasks, rating);
     setLoadingMsg(null);
 
-    // 先保存 dayRating 和 journalEntry，跳转到日记页面
-    // 等待用户保存后才正式更新 history
     setState((prev: AppState | null) => {
       if (!prev) return prev;
       return {
@@ -389,8 +424,11 @@ const App: React.FC = () => {
           ...prev.currentDay,
           dayRating: rating,
           journalEntry: summary,
+          journalCreatedAt: new Date().toISOString(),
+          // 将所有任务放入 inbox，显示完成状态
+          inbox: [...prev.currentDay.inbox, ...prev.currentDay.tasks],
         },
-        currentView: 'journal',
+        currentView: 'planning',
       };
     });
   };
