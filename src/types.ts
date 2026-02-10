@@ -9,6 +9,7 @@ export interface Task {
   reflection: string;
   doneAt?: string;
   encouragement?: string;
+  isInitial?: boolean; // 标记是否为当天初始任务
 }
 
 export interface DayRecord {

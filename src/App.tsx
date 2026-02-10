@@ -339,7 +339,8 @@ const App: React.FC = () => {
 
     const tasks: Task[] = tasksToUse.map((task: Task, idx: number) => ({
       ...task,
-      size: idx < 3 ? 'big' : 'small'
+      size: idx < 3 ? 'big' : 'small',
+      isInitial: true // 标记为初始任务
     }));
 
     // If we rolled over tasks, update the inbox first
@@ -418,6 +419,8 @@ const App: React.FC = () => {
 
     setState((prev: AppState | null) => {
       if (!prev) return prev;
+      // 只添加当天新增的任务（非初始任务）到 inbox
+      const addedTasks = prev.currentDay.tasks.filter((t: Task) => !t.isInitial);
       return {
         ...prev,
         currentDay: {
@@ -425,8 +428,8 @@ const App: React.FC = () => {
           dayRating: rating,
           journalEntry: summary,
           journalCreatedAt: new Date().toISOString(),
-          // 将所有任务放入 inbox，显示完成状态
-          inbox: [...prev.currentDay.inbox, ...prev.currentDay.tasks],
+          // 只将当天添加的任务放入 inbox，避免重复
+          inbox: [...prev.currentDay.inbox, ...addedTasks],
         },
         currentView: 'planning',
       };
