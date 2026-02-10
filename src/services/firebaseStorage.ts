@@ -115,6 +115,9 @@ const useLocalStorage = () => !db;
 let localInboxCount = 0;
 let localTasksCount = 0;
 
+// Track if rollover has been performed for current day
+let hasRolloveredForToday = false;
+
 // Flag to indicate initial load
 let isInitialLoad = true;
 
@@ -140,11 +143,12 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
 
       const { currentDay, history } = checkAndSwitchDay(data.currentDay, data.history || []);
 
-      // Only update if date actually changed (to avoid infinite loop)
-      if (currentDay.date !== data.currentDay.date) {
+      // Only update if date actually changed and hasn't been rolled over yet
+      if (currentDay.date !== data.currentDay.date && !hasRolloveredForToday) {
         data = { ...data, currentDay, history, currentView: 'planning' };
         localInboxCount = data.currentDay.inbox.length;
         localTasksCount = data.currentDay.tasks.length;
+        hasRolloveredForToday = true;
 
         // Reset dayRating and journalEntry when starting a new session on the same day
         if (data.currentDay.dayRating !== undefined) {
@@ -159,6 +163,10 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
 
         await setDoc(docRef, data);
       } else {
+        // Mark as already rolled over if date matches
+        if (currentDay.date === data.currentDay.date) {
+          hasRolloveredForToday = true;
+        }
         // Just update local counters from Firebase data
         const fbInboxCount = data.currentDay.inbox.length;
         const fbTasksCount = data.currentDay.tasks.length;
