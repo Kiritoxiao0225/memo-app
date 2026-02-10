@@ -125,7 +125,27 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
       }
 
       const { currentDay, history } = checkAndSwitchDay(data.currentDay, data.history || []);
-      data = { ...data, currentDay, history };
+
+      // Only update if date actually changed (to avoid infinite loop)
+      if (currentDay.date !== data.currentDay.date) {
+        data = { ...data, currentDay, history };
+
+        // Reset dayRating and journalEntry when starting a new session on the same day
+        if (data.currentDay.dayRating !== undefined) {
+          delete data.currentDay.dayRating;
+        }
+        if (data.currentDay.journalEntry !== undefined) {
+          delete data.currentDay.journalEntry;
+        }
+
+        // Add a timestamp to force Firebase to recognize data has changed
+        (data as any)._updatedAt = Date.now();
+
+        await setDoc(docRef, data);
+      } else {
+        // Just update state without saving
+        data = { ...data, currentDay, history };
+      }
 
       // If all tasks are completed and rated, auto-navigate to history
       const allDone = currentDay.isStarted && currentDay.tasks.length > 0 && currentDay.tasks.every((t) => t.isDone);
@@ -133,19 +153,6 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
         data.currentView = 'history';
       }
 
-      // Reset dayRating and journalEntry when starting a new session on the same day
-      if (data.currentDay.dayRating !== undefined) {
-        delete data.currentDay.dayRating;
-      }
-      if (data.currentDay.journalEntry !== undefined) {
-        delete data.currentDay.journalEntry;
-      }
-
-      // Add a timestamp to force Firebase to recognize data has changed
-      // This ensures rollover data is properly saved
-      (data as any)._updatedAt = Date.now();
-
-      await setDoc(docRef, data);
       callback(data);
       isInitialLoad = false;
     } else {
@@ -193,20 +200,27 @@ export const loadState = async (): Promise<AppState> => {
     }
 
     const { currentDay, history } = checkAndSwitchDay(data.currentDay, data.history || []);
-    data = { ...data, currentDay, history };
 
-    // Reset dayRating and journalEntry when starting a new session on the same day
-    if (data.currentDay.dayRating !== undefined) {
-      delete data.currentDay.dayRating;
+    // Only save if date actually changed
+    if (currentDay.date !== data.currentDay.date) {
+      data = { ...data, currentDay, history };
+
+      // Reset dayRating and journalEntry when starting a new session on the same day
+      if (data.currentDay.dayRating !== undefined) {
+        delete data.currentDay.dayRating;
+      }
+      if (data.currentDay.journalEntry !== undefined) {
+        delete data.currentDay.journalEntry;
+      }
+
+      // Add a timestamp to force Firebase to recognize data has changed
+      (data as any)._updatedAt = Date.now();
+
+      await setDoc(docRef, data);
+    } else {
+      data = { ...data, currentDay, history };
     }
-    if (data.currentDay.journalEntry !== undefined) {
-      delete data.currentDay.journalEntry;
-    }
 
-    // Add a timestamp to force Firebase to recognize data has changed
-    (data as any)._updatedAt = Date.now();
-
-    await setDoc(docRef, data);
     return data;
   }
 
