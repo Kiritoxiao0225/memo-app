@@ -17,6 +17,9 @@ const App: React.FC = () => {
   const [showEncouragement, setShowEncouragement] = useState<{title: string, msg: string} | null>(null);
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
+  // 流转提示
+  const [rolloverCount, setRolloverCount] = useState(0);
+
   // Inline editing state for the Thinking Pool
   const [editingInboxId, setEditingInboxId] = useState<string | null>(null);
   const [editingInboxValue, setEditingInboxValue] = useState('');
@@ -145,6 +148,8 @@ const App: React.FC = () => {
           encouragement: undefined,
         }));
 
+        setTimeout(() => setRolloverCount(undoneSmallTasksFromInbox.length), 100);
+
         return {
           ...prev,
           history: newHistory,
@@ -157,7 +162,7 @@ const App: React.FC = () => {
             journalEntry: undefined,
             journalCreatedAt: undefined,
           },
-          currentView: 'history',
+          currentView: 'planning',
         };
       }
 
@@ -701,6 +706,15 @@ const App: React.FC = () => {
           <button onClick={() => setShowEncouragement(null)} className="text-zinc-700 hover:text-white transition-colors p-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
+        </div>
+      )}
+
+      {/* 流转提示 */}
+      {rolloverCount > 0 && (
+        <div className="fixed top-10 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3 rounded-full shadow-xl animate-in fade-in slide-in-from-top-5 z-[120]">
+          <p className="text-sm font-medium">
+            提醒：有 {rolloverCount} 件未完成的小事已流转到下一天
+          </p>
         </div>
       )}
     </div>
