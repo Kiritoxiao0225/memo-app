@@ -111,13 +111,6 @@ const checkAndSwitchDay = (currentDay: DayRecord, history: DayRecord[]): { curre
 // Use localStorage fallback
 const useLocalStorage = () => !db;
 
-// Track local state for comparison (to avoid overwriting user updates)
-let localInboxCount = 0;
-let localTasksCount = 0;
-
-// Track if rollover has been performed for current day
-let hasRolloveredForToday = false;
-
 // Flag to indicate initial load
 let isInitialLoad = true;
 
@@ -141,14 +134,21 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
         data = { ...data, currentView: 'planning' };
       }
 
+      // 获取今天的日期字符串
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
+
+      // 检查是否需要执行流转（只有日期变化且今天还没流转过才执行）
+      const needsRollover = data.currentDay.date !== todayStr && data.lastRolloverDate !== todayStr;
+
       const { currentDay, history } = checkAndSwitchDay(data.currentDay, data.history || []);
 
-      // Only update if date actually changed and hasn't been rolled over yet
-      if (currentDay.date !== data.currentDay.date && !hasRolloveredForToday) {
-        data = { ...data, currentDay, history, currentView: 'planning' };
-        localInboxCount = data.currentDay.inbox.length;
-        localTasksCount = data.currentDay.tasks.length;
-        hasRolloveredForToday = true;
+      if (needsRollover) {
+        // 执行流转
+        data = { ...data, currentDay, history, currentView: 'planning', lastRolloverDate: todayStr };
 
         // Reset dayRating and journalEntry when starting a new session on the same day
         if (data.currentDay.dayRating !== undefined) {
@@ -163,30 +163,21 @@ export const subscribeToData = (callback: (state: AppState) => void) => {
 
         await setDoc(docRef, data);
       } else {
-        // Mark as already rolled over if date matches
-        if (currentDay.date === data.currentDay.date) {
-          hasRolloveredForToday = true;
-        }
-        // Just update local counters from Firebase data
-        const fbInboxCount = data.currentDay.inbox.length;
-        const fbTasksCount = data.currentDay.tasks.length;
-
-        // Only update state if Firebase has more data than local
-        // This prevents overwriting user-added content
-        if (fbInboxCount > localInboxCount || fbTasksCount > localTasksCount) {
-          data = { ...data, currentDay, history };
-          localInboxCount = data.currentDay.inbox.length;
-          localTasksCount = data.currentDay.tasks.length;
-        }
-        // If Firebase has less or equal data, skip update to preserve local changes
+        // 如果今天已经流转过，直接更新数据（不重复流转）
+        data = { ...data, currentDay, history };
       }
 
       callback(data);
       isInitialLoad = false;
     } else {
-      const today = new Date().toISOString().split('T')[0];
+      // 使用本地时区日期
+      const t = new Date();
+      const y = t.getFullYear();
+      const m = String(t.getMonth() + 1).padStart(2, '0');
+      const d = String(t.getDate()).padStart(2, '0');
+      const todayStr = `${y}-${m}-${d}`;
       const defaultState: AppState = {
-        currentDay: createNewDay(today),
+        currentDay: createNewDay(todayStr),
         history: [],
         currentView: 'planning',
       };
@@ -227,11 +218,20 @@ export const loadState = async (): Promise<AppState> => {
       data = { ...data, currentView: 'planning' };
     }
 
+    // 获取今天的日期字符串
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+
+    // 检查是否需要执行流转
+    const needsRollover = data.currentDay.date !== todayStr && data.lastRolloverDate !== todayStr;
+
     const { currentDay, history } = checkAndSwitchDay(data.currentDay, data.history || []);
 
-    // Only save if date actually changed
-    if (currentDay.date !== data.currentDay.date) {
-      data = { ...data, currentDay, history, currentView: 'planning' };
+    if (needsRollover) {
+      data = { ...data, currentDay, history, currentView: 'planning', lastRolloverDate: todayStr };
 
       // Reset dayRating and journalEntry when starting a new session on the same day
       if (data.currentDay.dayRating !== undefined) {

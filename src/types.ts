@@ -28,4 +28,5 @@ export interface AppState {
   currentDay: DayRecord;
   history: DayRecord[];
   currentView: 'planning' | 'working' | 'journal' | 'history';
+  lastRolloverDate?: string; // 记录上次流转的日期，避免重复流转
 }
